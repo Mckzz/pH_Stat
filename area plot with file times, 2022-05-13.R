@@ -110,11 +110,12 @@ file.reps <- data.frame(rep.file.time) %>%
   mutate(rep.seconds) %>%
   mutate(rep.minutes_from_start) %>%
   mutate(data, Area) %>% #get areas from imported .csv
-  mutate(sac = rep(c(1,2,3,4), times = nrow(exp.times))) %>% #sac ID column
+  mutate(sac = 
+           rep(c(1,2,3,4), times = nrow(exp.times))) %>% #sac ID column
   group_by(sac) %>%
   mutate(
-    area.pct.change = ((Area - Area[1]) / Area[1]
-    )*100) %>%
+    area.pct.change = ((Area - Area[1]) / Area[1])
+    *100) %>%
   ungroup()
 
 file.reps <- merge(file.reps, OCP_V_time, all = TRUE) %>% # insert rows for the pH data points
@@ -152,8 +153,8 @@ ggplot(data = file.reps,
 
 #subset of experiment times
 time.subset <- file.reps %>%
-  filter(rep.minutes_from_start > 198, rep.minutes_from_start < 260) %>%  
-  mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove unresponsive sac from analysis
+  filter(rep.minutes_from_start > 200) #%>%  
+  #mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove unresponsive sac from analysis
 
 print(time.subset)
 
@@ -170,8 +171,8 @@ ggplot(data = time.subset,
   ggtitle("selected linear region")
 
 # model for slope of area of interest (the above subset)
-k <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
-summary(k)
+l <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
+summary(l)
 #summary(n)
 
 ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start)) +
