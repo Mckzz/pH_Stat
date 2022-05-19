@@ -133,11 +133,11 @@ ggplot(data = file.reps,
            colour= sac)) +
   geom_point(aes(y= area.pct.change)) +
   geom_line(aes(y= area.pct.change)) +
-  geom_point(aes(y= (pH *30) - 181.0353), # magnify relative to main axis, 
+  geom_point(aes(y= (pH *30) - 181.0353 - 4), # magnify relative to main axis, 
   #translate pH points so final point = zero -> see scale_y_continuous
             size = 4.4,
            colour = "orangered3") +
-   scale_y_continuous(sec.axis = sec_axis(~./30 + 6.034511, name = "pH")) + # /20 to undo magnify, 
+   scale_y_continuous(sec.axis = sec_axis(~./30 + 6.034511 + (4/30), name = "pH")) + # /20 to undo magnify, 
   # +8.021611 to translate final pH point back to its proper value on the 2nd axis
   #geom_vline(xintercept = 195, colour = "green3") + 
   #geom_vline(xintercept = 197.8, colour = "green3") + 
