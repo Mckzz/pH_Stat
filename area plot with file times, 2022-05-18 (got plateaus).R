@@ -2,6 +2,9 @@ install.packages("tidyverse")
 library(tidyverse)
 library(ggplot2)
 library(readr)
+install.packages("ggpubr")
+library(ggpubr)
+
 
 options(pillar.sigfig = 4)
 
@@ -164,11 +167,12 @@ ggplot(data = file.reps,
 
 #subset of experiment times
 time.subset <- file.reps %>%
-  filter(rep.minutes_from_start > 200) #%>%  
+  filter(rep.minutes_from_start > 146, rep.minutes_from_start < 192) #%>%  
 #mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove unresponsive sac from analysis
 
 print(time.subset)
 
+#selected linear region plot
 ggplot(data = time.subset, 
        aes(x= rep.minutes_from_start, 
            group = sac, 
@@ -181,13 +185,40 @@ ggplot(data = time.subset,
   #theme(legend.position = "none") +
   ggtitle("selected linear region")
 
-# model for slope of area of interest (the above subset)
-l <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
-summary(l)
-#summary(n)
-
+#regression plot with linear formula and r2
 ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start)) +
   geom_point(size = 2, col = "red") +
   geom_smooth(method = "lm", se = FALSE) +
+  stat_regline_equation(label.y = -4, aes(label = ..eq.label..)) +
+  stat_regline_equation(label.y = -4.5, aes(label = ..rr.label..))
   theme(aspect.ratio = 0.80) +
   theme_classic()
+
+# model for slope of area of interest (the above subset)
+q <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
+summary(q)
+#summary(n)
+
+
+
+install.packages("ggpmisc")
+library(ggpmisc)
+
+eq <- function(x,y) {
+  m <- lm(y ~ x)
+  as.character(
+    as.expression(
+      substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2,
+                 list(a = format(coef(m)[1], digits = 4),
+                      b = format(coef(m)[2], digits = 4),
+                      r2 = format(summary(m)$r.squared, digits = 3)))
+    )
+  )
+}
+
+ggplot(time.subset, aes(x = rep.minutes_from_start, y = area.pct.change)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se=FALSE) +
+  geom_text(x = 160, y = -5, label = eq(time.subset$rep.minutes_from_start, 
+                                       time.subset$area.pct.change), 
+            parse = TRUE)
