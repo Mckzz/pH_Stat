@@ -134,31 +134,31 @@ ggplot(data = file.reps,
   geom_point(aes(y= area.pct.change)) +
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
-  geom_point(aes(y= (pH *30) - 184.2054 - 9), # magnify relative to main axis, 
-             #translate pH points so first point = zero, translate down for fit -> see scale_y_continuous
+  geom_point(aes(y= (pH *30) - 184.2054 - 14), # magnify relative to main axis, translate points so first point = zero, translate down for fit -> see scale_y_continuous
              size = 4.4,
              colour = "orangered3") +
   scale_y_continuous(sec.axis = 
-                       sec_axis(~./30 + 6.14018 + (9/30), # / by magnify factor, + start pH, + (vert translation/ mag factor)
-                                name = "pH")) +  
+                       sec_axis(~./30 + 6.14018 + (14/30), # / by magnify factor, + start pH, + (vert translation/ mag factor)
+                                name = "pH", 
+                                breaks = c(6.25, 6.5, 6.75, 7, 7.25))) +  
   geom_vline(xintercept = 49.9, colour = "black") + 
-  geom_vline(xintercept = 64.9, colour = "grey") + 
+  geom_vline(xintercept = 57.7, colour = "grey") +
+  geom_vline(xintercept = 64.9, colour = "grey") +
   geom_vline(xintercept = 364.9, colour = "black") + 
-  annotate("rect", xmin=126.45, xmax=126.45 + 13.578, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=145.6333, xmax=145.6333 + 13.626, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=165.55, xmax=165.55  + 9.79125, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=179.55, xmax=179.55  + 1.03657, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=186.783, xmax=186.783  + 1.2828, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=250.65, xmax=250.65  + 13.63425, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=272.8, xmax=272.8  + 13.6398, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=291.16, xmax=291.16  + 13.661, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin=305.08, xmax=305.08  + 9.6026, ymin=-15, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=126.45, xmax=126.45 + 13.578, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=145.6333, xmax=145.6333 + 13.626, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=165.55, xmax=165.55  + 9.79125, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=179.55, xmax=179.55  + 1.03657, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=186.783, xmax=186.783  + 1.2828, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=250.65, xmax=250.65  + 13.63425, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=272.8, xmax=272.8  + 13.6398, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=291.16, xmax=291.16  + 13.661, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=305.08, xmax=305.08  + 9.6026, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
   labs(x = "Minutes", 
        y = "Sac area % change") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 24)) +
-  #theme(legend.position = "top") +
   theme(legend.position = c(0.07, 0.8))
 
 
