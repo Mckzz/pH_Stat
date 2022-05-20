@@ -185,12 +185,14 @@ ggplot(data = time.subset,
   #theme(legend.position = "none") +
   ggtitle("selected linear region")
 
-#regression plot with linear formula and r2
-ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start)) +
+#regression plot with linear formula and r2 using ggpubr package
+trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
+
+ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start), lab.nb.digits = 6) +
   geom_point(size = 2, col = "red") +
   geom_smooth(method = "lm", se = FALSE) +
   stat_regline_equation(label.y = -4, aes(label = ..eq.label..)) +
-  stat_regline_equation(label.y = -4.5, aes(label = ..rr.label..))
+  stat_regline_equation(label.y = -4.5, aes(label = ..rr.label..)) +
   theme(aspect.ratio = 0.80) +
   theme_classic()
 
@@ -201,6 +203,7 @@ summary(q)
 
 
 
+#another way with a function
 install.packages("ggpmisc")
 library(ggpmisc)
 
