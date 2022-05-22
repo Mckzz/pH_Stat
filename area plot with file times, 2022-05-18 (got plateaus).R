@@ -1,8 +1,6 @@
-install.packages("tidyverse")
 library(tidyverse)
 library(ggplot2)
 library(readr)
-install.packages("ggpubr")
 library(ggpubr)
 
 
@@ -125,7 +123,7 @@ file.reps <- data.frame(rep.file.time) %>%
 file.reps <- merge(file.reps, OCP_V_time, all = TRUE) #%>% # insert rows for the pH data points
   #filter(rep.minutes_from_start >= 0)
 
-view(file.reps, n = 50)
+head(file.reps, n = 50)
 
 
 ########################     plotting and stats    ########################
@@ -167,7 +165,7 @@ ggplot(data = file.reps,
 
 #subset of experiment times
 time.subset <- file.reps %>%
-  filter(rep.minutes_from_start > 146, rep.minutes_from_start < 192) #%>%  
+  filter(rep.minutes_from_start > 255, rep.minutes_from_start < 320) #%>%  
 #mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove unresponsive sac from analysis
 
 print(time.subset)
@@ -177,29 +175,83 @@ ggplot(data = time.subset,
        aes(x= rep.minutes_from_start, 
            group = sac, 
            colour= sac)) +
-  geom_point(aes(y= area.pct.change)) +
-  geom_line(aes(y= area.pct.change)) +
+  geom_point(aes(y= Area)) +
+  geom_line(aes(y= Area)) +
   labs(x = "Minutes", 
-       y = "Sac area % change") +
+       y = "Area") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 24)) +
   #theme(legend.position = "none") +
   ggtitle("selected linear region")
 
 #regression plot with linear formula and r2 using ggpubr package
-trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
 
-ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start), lab.nb.digits = 6) +
+#trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
+
+ggplot(time.subset, aes(y = Area, x = rep.minutes_from_start), lab.nb.digits = 6) +
   geom_point(size = 2, col = "red") +
   geom_smooth(method = "lm", se = FALSE) +
-  stat_regline_equation(label.y = -4, aes(label = ..eq.label..)) +
-  stat_regline_equation(label.y = -4.5, aes(label = ..rr.label..)) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 1, 
+                        aes(label = ..eq.label..)) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 0.9, 
+                        aes(label = ..rr.label..)) +
   theme(aspect.ratio = 0.80) +
   theme_classic()
 
 # model for slope of area of interest (the above subset)
-q <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
+q <- lm(Area ~ rep.minutes_from_start, data = time.subset)
 summary(q)
 #summary(n)
+
+### for plateaus
+
+# make the three plateaus and get a median pH column with no NAs
+plateau.1 <- file.reps %>%
+  filter(rep.minutes_from_start > 70, rep.minutes_from_start < 130) %>%
+  mutate(plateau = "plateau1") %>%
+  mutate(med_pH = median(pH, na.rm = T))
+plateau.2 <- file.reps %>%
+  filter(rep.minutes_from_start > 190, rep.minutes_from_start < 250) %>%
+  mutate(plateau = "plateau2") %>%
+  mutate(med_pH = median(pH, na.rm = T))
+plateau.3 <- file.reps %>%
+  filter(rep.minutes_from_start > 320, rep.minutes_from_start < 365) %>%
+  mutate(plateau = "plateau3") %>%
+  mutate(med_pH = median(pH, na.rm = T))
+
+head(plateau.1, n= 40)
+
+# combine the plateaus and remove NAs from the other columns
+plateaus <- rbind(plateau.1, plateau.2, plateau.3) %>%
+  select(plateau, med_pH, rep.minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit()
+print(plateaus)
+
+# mean and sd data frame for absolute areas and % changes as the change over the time within a plateau
+plateaus.mean.sd <-
+  plateaus %>%
+  select(-plateau, -rep.minutes_from_start) %>% 
+  group_by(med_pH, sac) %>%
+  summarize(across(everything(), na.rm= T,
+                   tibble::lst(mean = mean, sd = sd)))
+
+print(plateaus.mean.sd, n= 40)
+
+# error bars show degree of sac size change within the time of the given plateau
+ggplot(data = plateaus.mean.sd, 
+       aes(x= med_pH, 
+           group = sac, 
+           colour= sac)) +
+  geom_point(position = position_dodge(width = 0.1),
+             aes(y= area.pct.change_mean)) +
+  geom_errorbar(position = position_dodge(width = 0.1), 
+                mapping = aes(x = med_pH,
+                              ymin = area.pct.change_mean - area.pct.change_sd,
+                              ymax = area.pct.change_mean + area.pct.change_sd), 
+                width = 0.05,
+                size = 0.75)
+
 
 
 
