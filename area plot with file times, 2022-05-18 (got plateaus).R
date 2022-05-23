@@ -175,19 +175,18 @@ ggplot(data = time.subset,
        aes(x= rep.minutes_from_start, 
            group = sac, 
            colour= sac)) +
-  geom_point(aes(y= Area)) +
-  geom_line(aes(y= Area)) +
+  geom_point(aes(y= area.pct.change)) +
+  geom_line(aes(y= area.pct.change)) +
+  scale_colour_discrete(na.translate = F) +
   labs(x = "Minutes", 
-       y = "Area") +
+       y = "% change") +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 24)) +
   #theme(legend.position = "none") +
   ggtitle("selected linear region")
 
-#regression plot with linear formula and r2 using ggpubr package
-
+#regression plot of the one sample selected linear region with linear formula and r2 using ggpubr package
 #trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
-
-ggplot(time.subset, aes(y = Area, x = rep.minutes_from_start), lab.nb.digits = 6) +
+ggplot(time.subset, aes(y = area.pct.change, x = rep.minutes_from_start), lab.nb.digits = 6) +
   geom_point(size = 2, col = "red") +
   geom_smooth(method = "lm", se = FALSE) +
   stat_regline_equation(label.x.npc = 0, 
@@ -200,39 +199,46 @@ ggplot(time.subset, aes(y = Area, x = rep.minutes_from_start), lab.nb.digits = 6
   theme_classic()
 
 # model for slope of area of interest (the above subset)
-q <- lm(Area ~ rep.minutes_from_start, data = time.subset)
+q <- lm(area.pct.change ~ rep.minutes_from_start, data = time.subset)
 summary(q)
 #summary(n)
 
-### for plateaus
+######################      for plateaus      ######################
 
 # make the three plateaus and get a median pH column with no NAs
 plateau.1 <- file.reps %>%
   filter(rep.minutes_from_start > 70, rep.minutes_from_start < 130) %>%
   mutate(plateau = "plateau1") %>%
-  mutate(med_pH = median(pH, na.rm = T))
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
 plateau.2 <- file.reps %>%
   filter(rep.minutes_from_start > 190, rep.minutes_from_start < 250) %>%
   mutate(plateau = "plateau2") %>%
-  mutate(med_pH = median(pH, na.rm = T))
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
 plateau.3 <- file.reps %>%
   filter(rep.minutes_from_start > 320, rep.minutes_from_start < 365) %>%
   mutate(plateau = "plateau3") %>%
-  mutate(med_pH = median(pH, na.rm = T))
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
 
-head(plateau.1, n= 40)
+head(plateau.3)
 
 # combine the plateaus and remove NAs from the other columns
 plateaus <- rbind(plateau.1, plateau.2, plateau.3) %>%
   select(plateau, med_pH, rep.minutes_from_start, sac, Area, area.pct.change) %>%
-  na.omit()
-print(plateaus)
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
 
-# mean and sd data frame for absolute areas and % changes as the change over the time within a plateau
+print(plateaus, n= 40)
+
+# mean and sd data frame for absolute areas and % changes as they change over the time within a plateau
 plateaus.mean.sd <-
   plateaus %>%
-  select(-plateau, -rep.minutes_from_start) %>% 
-  group_by(med_pH, sac) %>%
+  select(-rep.minutes_from_start) %>% 
+  group_by(plateau, med_pH, sac) %>%
   summarize(across(everything(), na.rm= T,
                    tibble::lst(mean = mean, sd = sd)))
 
@@ -249,31 +255,62 @@ ggplot(data = plateaus.mean.sd,
                 mapping = aes(x = med_pH,
                               ymin = area.pct.change_mean - area.pct.change_sd,
                               ymax = area.pct.change_mean + area.pct.change_sd), 
-                width = 0.05,
-                size = 0.75)
+                width = 0.1,
+                size = 0.5)
+
+# modeled slopes pf sac size (% or abs) with pH
+ggplot(plateaus, aes(y = area.pct.change, x = med_pH, group = sac, colour = sac), 
+       lab.nb.digits = 4) +
+  geom_point(size = 2, col = "red") +
+  geom_smooth(method = "lm", se = T) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 1, 
+                        aes(label = ..eq.label..)) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 0.8, 
+                        aes(label = ..rr.label..)) +
+  theme(aspect.ratio = 0.80) +
+  theme_classic()
+
+w <- lm(area.pct.change ~ med_pH, data = plateaus)
+summary(w)
 
 
+#################   getting coeffs for the two sections (pH1 -- pH2, pH2 -- pH3)     ###############
 
+# make model to get the coefficients for the first interval of plateaus model plot
+plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
+  select(plateau, med_pH, rep.minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
 
-#another way with a function
-install.packages("ggpmisc")
-library(ggpmisc)
+first.half <- lm(area.pct.change ~ med_pH, data = plateaus.1.2)
+summary(first.half)
 
-eq <- function(x,y) {
-  m <- lm(y ~ x)
-  as.character(
-    as.expression(
-      substitute(italic(y) == a + b %.% italic(x)*","~~italic(r)^2~"="~r2,
-                 list(a = format(coef(m)[1], digits = 4),
-                      b = format(coef(m)[2], digits = 4),
-                      r2 = format(summary(m)$r.squared, digits = 3)))
-    )
-  )
-}
+# make model to get the coefficients for the second interval of plateaus model plot
+plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
+  select(plateau, med_pH, rep.minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
 
-ggplot(time.subset, aes(x = rep.minutes_from_start, y = area.pct.change)) + 
-  geom_point() + 
-  geom_smooth(method = "lm", se=FALSE) +
-  geom_text(x = 160, y = -5, label = eq(time.subset$rep.minutes_from_start, 
-                                       time.subset$area.pct.change), 
-            parse = TRUE)
+second.half <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
+summary(second.half)
+
+#plot for the two intervals modeled separately
+plateaus.diffslopes <- rbind(plateau.1, plateau.2, plateau.3) %>%
+  select(plateau, med_pH, rep.minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
+
+ggplot(plateaus.diffslopes, aes(y = area.pct.change, x = med_pH, group = sac, colour = sac), 
+       lab.nb.digits = 4) +
+  geom_point(size = 2, col = "red") +
+  geom_smooth(method = "loess", se = T) +
+  theme(aspect.ratio = 0.80) +
+  theme_classic()
