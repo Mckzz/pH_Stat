@@ -12,14 +12,15 @@ setwd("C:/Users/evanm/Documents/My Procedures 1.11/Nova")
 # get a list of when nova made the calib and galv files: gets all .nox files
 nox_files <- list.files(pattern ="*.nox",
                         ignore.case= T)
-#print(nox_files)
+print(nox_files)
 
 # create a df with the POSIx seconds for when all the .nox files were created (the end of each nova command) 
 nox.times <- data.frame(file.info(nox_files)$ctime) %>%
   mutate(nox_files) %>%
   rename(nox.file.time = file.info.nox_files..ctime) %>%
   arrange(nox.file.time) %>%
-  mutate(nox.seconds = as.numeric(nox.file.time)) #seconds from arbitrary date (POSIX)
+  mutate(nox.seconds = as.numeric(nox.file.time)) %>% #seconds from arbitrary date (POSIX)
+  mutate(nox_files = substr(nox_files, 1, nchar(nox_files)-4)) #what to include: start at 1st element, stop at 4th last (just before .file ext)
 
 head(nox.times, n = 24)
 
@@ -28,11 +29,13 @@ list_of_OCP.CSVs <-
   list.files(path = "~/student_documents/UBC/Research/pH_stat/with_a_sac_(prelim)/2022-05-25, strong buff H2 control/OCPs",
              recursive = TRUE,
              pattern = "\\.csv$",
-             full.names = TRUE)
+             full.names = F)
+head(list_of_OCP.CSVs, n = 10)
 
+setwd("~/student_documents/UBC/Research/pH_stat/with_a_sac_(prelim)/2022-05-25, strong buff H2 control/OCPs")
 OCPs.df <- readr::read_csv(list_of_OCP.CSVs, id = "OCP.files") %>%
   mutate(...3 = NULL)
-view(OCPs.df, n = 10)
+head(OCPs.df, n = 10)
 
 ######################     set working directory to folder with image files     ######################
 # sac size data image file times
@@ -65,20 +68,13 @@ head(exp.times, n = 12)
 # the middle time point and median V for each for the combined plot (must recalc substring rename positions)
 OCPs_with_calcs <- OCPs.df %>%
   mutate(minutes_from_OCP_start = (seconds - seconds[1])/60) %>% 
-  group_by(OCP.files) %>% # can be off by the fraction of a second diff between OCP seconds start time
+  mutate(OCP.files = substr(OCP.files, 1, nchar(OCP.files)-4)) %>%
+  group_by(OCP.files) %>%
   mutate(median_V = median(V)) %>%
   mutate(exp_start = (exp.times$seconds[1])) %>%
-  mutate(substring(OCP.files, 125)) %>% #new column with ocp.files dropping the path before the file name (here position 101)
-  mutate(substring(substring(OCP.files, 125), 1, 18)) %>% ## drop file extension (works as long as the OCP # has three digits)
-  rename(OCP = 'substring(substring(OCP.files, 125), 1, 18)') %>% # fix stupid column name
-  mutate(OCP = paste(OCP, "nox", sep = ".")) %>% ## now OCP should = the nox.times$nox_files so they can be linked later
-  mutate('substring(OCP.files, 125)' = NULL) %>%
-  ungroup() %>%
-  group_by(OCP) %>%
-  mutate(OCP.files = NULL) %>%
   mutate(exp.time.point = 
            ((nox.times$nox.seconds[
-             nox.times$nox_files == OCP] ## the end of an OCP run
+             nox.times$nox_files == OCP.files] ## the end of an OCP run
              - median(seconds)) ## the middle of an OCP run (to be subtracted from end time for 1/2 time)
             - exp_start) ## put in relation to POSIX experiment start time
          /60) ## minutes
@@ -122,10 +118,9 @@ file.reps <- data.frame(rep.file.time) %>%
 
 # insert rows for the pH data points
 file.reps <- merge(file.reps, OCP_V_time, all = TRUE) %>% 
-  filter(rep.minutes_from_start < 1222)
+  filter(rep.minutes_from_start > 85, rep.minutes_from_start < 1222)
 
-tail(file.reps, n = 20)
-
+head(file.reps, n = 20)
 
 ########################     plotting and stats    ########################
 
@@ -136,25 +131,25 @@ ggplot(data = file.reps,
   geom_point(aes(y= area.pct.change)) +
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
-  geom_point(aes(y= (pH *10) - 59.95673 + 2.5), # magnify relative to main axis, translate points so first point = zero, translate for fit -> see scale_y_continuous
+  geom_point(aes(y= (pH *7) - 41.96971 + 1), # magnify relative to main axis, translate points so first point = zero, translate for fit -> see scale_y_continuous
              size = 4.4,
              colour = "orangered3") +
   scale_y_continuous(sec.axis = 
-                       sec_axis(~./10 + 5.995673 - (2.5/10), # / by magnify factor, + start pH, + (vert translation/ mag factor)
-                                name = "pH")) +
-  geom_hline(yintercept = 0.23, colour = "blue") +
-  geom_hline(yintercept = 0.73, colour = "green") +
-  geom_hline(yintercept = 0.26, colour = "lightcoral") +
-  #annotate("rect", xmin=126.45, xmax=126.45 + 13.578, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
-  #annotate("rect", xmin=145.6333, xmax=145.6333 + 13.626, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
-  #annotate("rect", xmin=165.55, xmax=165.55  + 9.79125, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
-  #annotate("rect", xmin=179.55, xmax=179.55  + 1.03657, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
- # annotate("rect", xmin=186.783, xmax=186.783  + 1.2828, ymin=-16, ymax=22, fill = "green3", alpha=0.2) +
+                       sec_axis(~./7 + 5.995673 - (1/7), # / by magnify factor, + start pH, + (vert translation/ mag factor)
+                                name = "pH",
+                                breaks = c(6.0, 6.2, 6.4, 6.6, 6.8, 7.0))) +
+  #geom_hline(yintercept = 0.23, colour = "blue") +
+  #geom_hline(yintercept = 0.73, colour = "green") +
+  #geom_hline(yintercept = 0.26, colour = "lightcoral") +
+  annotate("rect", xmin=107.433, xmax=107.433 + 13.63688, ymin=0, ymax=8.5, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=155.1667, xmax=155.1667 + 13.63, ymin=0, ymax=8.5, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=175.0833, xmax=175.0833 + 13.66, ymin=0, ymax=8.5, fill = "green3", alpha=0.2) +
+  annotate("rect", xmin=221.166, xmax=221.166 + 13.66, ymin=0, ymax=8.5, fill = "green3", alpha=0.2) +
   labs(x = "Minutes", 
        y = "Sac area % change") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 15)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 25)) +
   theme(legend.position = c(0.07, 0.8))
 
 
