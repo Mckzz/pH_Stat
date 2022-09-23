@@ -7,13 +7,13 @@ options(pillar.sigfig = 4)
 
 ##################   sac areas .csv and image files with file times   #################
 areas <- 
-  read_csv("~/student_documents/UBC/Research/pH_stat/2022-07-21 Strong and weak buffs gas control/results.csv") %>%
+  read_csv("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/results.csv") %>%
   mutate(...1 = NULL) %>%
   mutate(Mean = NULL)
 print(areas)
 
 # set working directory to folder with image files
-setwd("~/student_documents/UBC/Research/pH_stat/2022-07-21 Strong and weak buffs gas control/images")
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/images")
 
 # get a list of all the image files to extract the times for
 jpg_files <- list.files(pattern ="*.jpg",
@@ -29,9 +29,9 @@ image.info <- data.frame(file.info(jpg_files)$ctime) %>%
   arrange(file.time) %>% #arrange by time of file creation
   mutate(seconds = as.numeric(file.time)) %>% #seconds from arbitrary date (POSIX)
   mutate(minutes_from_start = (seconds - seconds[1])/60) %>%
-  slice(rep(1:n(), each = 3)) %>% # repeat rows for the number of sacs in each image
-  mutate(sac = rep(c("1","2","3"), # sac ID column, sacs/image repeated for #of images
-                   times = (length(jpg_files) /3 ))) %>% 
+  slice(rep(1:n(), each = 4)) %>% # repeat rows for the number of sacs in each image
+  mutate(sac = rep(c("1","2","3","4"), # sac ID column, sacs/image repeated for #of images
+                   times = (length(jpg_files) /4 ))) %>% 
   mutate(areas) %>%
   group_by(sac) %>%
   mutate(area.pct.change = 
@@ -41,7 +41,7 @@ image.info <- data.frame(file.info(jpg_files)$ctime) %>%
 head(image.info, n = 12)
 
 #####################        ASCII OCPs        ########################
-setwd("~/student_documents/UBC/Research/pH_stat/2022-07-21 Strong and weak buffs gas control/pH")
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/pH")
 
 list_of_OCP.ascii <- # list of file names
   list.files(pattern = "\\.txt$",
@@ -61,7 +61,7 @@ OCPs.df <- read_delim(list_of_OCP.ascii,
   mutate(OCP.files = substr(OCP.files, 1, nchar(OCP.files)-4)) %>% #drop file extension so that OCPs can relate to image file times
   group_by(OCP.files) %>%
   mutate(median_V = median(V)) %>%
-  mutate(pH = (median_V + 0.3502)/0.054) %>% # Volts to pH
+  mutate(pH = (median_V + 0.3582)/0.054) %>% # Volts to pH
   mutate(exp_start = (image.info$seconds[1])) %>% #1st image POSIX time
   mutate(minutes_from_start =        # time point of pH measurement relative to image file times
            ((OCP.file.seconds ## the end of an OCP run
@@ -71,13 +71,13 @@ OCPs.df <- read_delim(list_of_OCP.ascii,
 
 head(OCPs.df, n = 10)
 
-# simplified pH data frame for integration with sac area/ image data frame
+# simplified pH data frame for integration with sac area/ image data frame, with OCP measures placed in correct order
 pH.info <- OCPs.df %>%
   select(minutes_from_start, pH, OCP.files) %>%
   unique() %>%
   arrange(minutes_from_start)
 
-head(pH.info, n= 11)
+head(pH.info, n= 20)
 
 combined <- merge(image.info, pH.info, all = TRUE) #%>% 
   #filter(rep.minutes_from_start > 85, rep.minutes_from_start < 1222)
@@ -87,7 +87,7 @@ head(combined, n = 12)
 
 ########################    for current cycle ascii files    #######################
 
-setwd("~/student_documents/UBC/Research/pH_stat/2022-07-21 Strong and weak buffs gas control/current")
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/current")
 
 current.files <- # list of file names
   list.files(pattern = "\\.txt$",
@@ -139,32 +139,132 @@ ggplot(data = combined,
   geom_point(aes(y= area.pct.change)) +
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
-  scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
-  #geom_point(aes(y= (pH *3) - 18.027843 + 0.5), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
-            # size = 4.4,
-            # colour = "orangered3") +
- # scale_y_continuous(sec.axis = sec_axis(~./3 + 6.009281 - (0.5/3), # / by magnify factor, + start pH, + (vert translation/ mag factor)
-                                        # name = "pH", 
-                                        # breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
+  #scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
+  #geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
+             #size = 4.4,
+             #colour = "orangered3") +
+  #scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
+                                         #name = "pH", 
+                                         #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
   annotate("rect", xmin= current.times.table$current.start.time[1], 
            xmax= current.times.table$current.file.time[1], 
-           ymin=-2, ymax=14, fill = "green3", alpha=0.2) +
+           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[2], 
            xmax= current.times.table$current.file.time[2], 
-           ymin=-2, ymax=14, fill = "green3", alpha=0.2) +
+           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[3], 
            xmax= current.times.table$current.file.time[3], 
-           ymin=-2, ymax=14, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin= current.times.table$current.start.time[4], 
-           xmax= current.times.table$current.file.time[4], 
-           ymin=-2, ymax=14, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin= current.times.table$current.start.time[5], 
-           xmax= current.times.table$current.file.time[5], 
-           ymin=-2, ymax=14, fill = "green3", alpha=0.2) +
+           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+  #geom_vline(xintercept = 117) +
   labs(x = "Minutes", 
        y = "area % change") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 25)) +
-  theme(legend.position = c(0.07, 0.8))
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
+  theme(legend.position = c(0.08, 0.4))
+
+
+
+
+
+###############################   extract plateaus   ####################################
+
+#subset of experiment times (could be plateau or linear increase region)
+time.subset <- combined %>%
+  filter(minutes_from_start > 150, minutes_from_start < 310) #%>% 
+#mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove damaged/ unresponsive sac from analysis
+
+print(time.subset)
+
+#selected linear region plot
+ggplot(data = time.subset, 
+       aes(x= minutes_from_start, 
+           group = sac, 
+           colour= sac)) +
+  geom_point(aes(y= area.pct.change)) +
+  geom_line(aes(y= area.pct.change)) +
+  scale_colour_discrete(na.translate = F) +
+  labs(x = "Minutes", 
+       y = "% change") +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
+  #theme(legend.position = "none") +
+  ggtitle("selected linear region")
+
+#regression plot of the one sample selected linear region with linear formula and r2 using ggpubr package
+ggplot(time.subset, aes(y = area.pct.change, x = minutes_from_start)) +
+  geom_point(size = 2, col = "red") +
+  geom_smooth(method = "lm", se = FALSE) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 1, 
+                        aes(label = ..eq.label..)) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 0.9, 
+                        aes(label = ..rr.label..)) +
+  theme_classic()
+
+# model for slope of area of interest (the above subset)
+q <- lm(area.pct.change ~ minutes_from_start, data = time.subset)
+summary(q)
+#summary(n)
+
+######################      for plateaus against pH 
+
+# make the three plateaus and get a median pH column with no NAs
+plateau.1 <- combined %>%
+  filter(minutes_from_start > 380, minutes_from_start < 430) %>%
+  mutate(plateau = "plateau1") %>%
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
+plateau.2 <- combined %>%
+  filter(minutes_from_start > 480, minutes_from_start < 550) %>%
+  mutate(plateau = "plateau2") %>%
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
+plateau.3 <- combined %>%
+  filter(minutes_from_start > 600, minutes_from_start < 675) %>%
+  mutate(plateau = "plateau3") %>%
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
+plateau.4 <- combined %>%
+  filter(minutes_from_start > 700, minutes_from_start < 800) %>%
+  mutate(plateau = "plateau4") %>%
+  mutate(med_pH = median(pH, na.rm = T)) %>%
+  as_tibble()
+
+head(plateau.3)
+
+# combine the plateaus and remove NAs from the other columns
+plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
+  select(plateau, med_pH, minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
+
+print(plateaus, n= 40)
+
+# mean and sd data frame for absolute areas and % changes as they change over the time within a plateau
+plateaus.mean.sd <-
+  plateaus %>%
+  select(-minutes_from_start) %>% 
+  group_by(plateau, med_pH, sac) %>%
+  summarize(across(everything(), na.rm= T,
+                   tibble::lst(mean = mean, sd = sd)))
+
+print(plateaus.mean.sd, n= 40)
+
+# error bars show degree of sac size change within the time of the given plateau
+ggplot(data = plateaus.mean.sd, 
+       aes(x= med_pH, 
+           group = sac, 
+           colour= sac)) +
+  geom_point(position = position_dodge(width = 0.1),
+             aes(y= area.pct.change_mean)) +
+  geom_errorbar(position = position_dodge(width = 0.1), 
+                mapping = aes(x = med_pH,
+                              ymin = area.pct.change_mean - area.pct.change_sd,
+                              ymax = area.pct.change_mean + area.pct.change_sd), 
+                width = 0.1,
+                size = 0.5)
+
 
