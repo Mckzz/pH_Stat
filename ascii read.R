@@ -166,52 +166,13 @@ ggplot(data = combined,
 
 
 
-
 ###############################   extract plateaus   ####################################
-
-#subset of experiment times (could be plateau or linear increase region)
-time.subset <- combined %>%
-  filter(minutes_from_start > 150, minutes_from_start < 310) #%>% 
-#mutate(area.pct.change = replace(area.pct.change, sac == 4, NA)) # remove damaged/ unresponsive sac from analysis
-
-print(time.subset)
-
-#selected linear region plot
-ggplot(data = time.subset, 
-       aes(x= minutes_from_start, 
-           group = sac, 
-           colour= sac)) +
-  geom_point(aes(y= area.pct.change)) +
-  geom_line(aes(y= area.pct.change)) +
-  scale_colour_discrete(na.translate = F) +
-  labs(x = "Minutes", 
-       y = "% change") +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 10)) +
-  #theme(legend.position = "none") +
-  ggtitle("selected linear region")
-
-#regression plot of the one sample selected linear region with linear formula and r2 using ggpubr package
-ggplot(time.subset, aes(y = area.pct.change, x = minutes_from_start)) +
-  geom_point(size = 2, col = "red") +
-  geom_smooth(method = "lm", se = FALSE) +
-  stat_regline_equation(label.x.npc = 0, 
-                        label.y.npc = 1, 
-                        aes(label = ..eq.label..)) +
-  stat_regline_equation(label.x.npc = 0, 
-                        label.y.npc = 0.9, 
-                        aes(label = ..rr.label..)) +
-  theme_classic()
-
-# model for slope of area of interest (the above subset)
-q <- lm(area.pct.change ~ minutes_from_start, data = time.subset)
-summary(q)
-#summary(n)
 
 ######################      for plateaus against pH 
 
-# make the three plateaus and get a median pH column with no NAs
+# make the 4 plateaus and get a median pH column with no NAs
 plateau.1 <- combined %>%
-  filter(minutes_from_start > 380, minutes_from_start < 430) %>%
+  filter(minutes_from_start > 400, minutes_from_start < 440) %>%
   mutate(plateau = "plateau1") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
@@ -221,7 +182,7 @@ plateau.2 <- combined %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.3 <- combined %>%
-  filter(minutes_from_start > 600, minutes_from_start < 675) %>%
+  filter(minutes_from_start > 600, minutes_from_start < 685) %>%
   mutate(plateau = "plateau3") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
@@ -238,7 +199,9 @@ plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
   select(plateau, med_pH, minutes_from_start, sac, Area, area.pct.change) %>%
   na.omit() %>%
   group_by(sac) %>%
+  mutate(med_pH = as_factor(med_pH)) %>%
   #mutate(med_pH = as_factor(med_pH)) %>%
+  mutate(day = "2022-08-30") %>% #COLUMN TO ID WHICH DAY'S EXPERIMENT THIS IS. to later allow appending of the other experiment days
   as_tibble()
 
 print(plateaus, n= 40)
@@ -246,7 +209,7 @@ print(plateaus, n= 40)
 # mean and sd data frame for absolute areas and % changes as they change over the time within a plateau
 plateaus.mean.sd <-
   plateaus %>%
-  select(-minutes_from_start) %>% 
+  select(-minutes_from_start, -day) %>% 
   group_by(plateau, med_pH, sac) %>%
   summarize(across(everything(), na.rm= T,
                    tibble::lst(mean = mean, sd = sd)))
@@ -266,5 +229,90 @@ ggplot(data = plateaus.mean.sd,
                               ymax = area.pct.change_mean + area.pct.change_sd), 
                 width = 0.1,
                 size = 0.5)
+
+
+# modeled slopes of sac size (% or abs) with pH
+ggplot(plateaus, aes(y = area.pct.change, x = med_pH, 
+                     group = sac, 
+                     colour = sac), 
+       lab.nb.digits = 6) +
+  geom_point(size = 2, col = "red") +
+  geom_smooth(method = "lm", se = T) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 1, 
+                        aes(label = ..eq.label..)) +
+  stat_regline_equation(label.x.npc = 0, 
+                        label.y.npc = 0.8, 
+                        aes(label = ..rr.label..)) +
+  theme_classic()
+
+w <- lm(area.pct.change ~ med_pH, data = plateaus)
+summary(w)
+
+
+#################   getting coeffs for sections eg. pH1 -- pH2, pH2 -- pH3... etc.     ###############
+
+# make model to get the coefficients for the first interval of plateaus model plot
+plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
+  select(plateau, 
+         med_pH, 
+         minutes_from_start, 
+         sac, 
+         Area, 
+         area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
+
+first.half <- lm(area.pct.change ~ med_pH, data = plateaus.1.2)
+summary(first.half)
+
+# make model to get the coefficients for the second interval of plateaus model plot
+plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
+  select(plateau, 
+         med_pH, 
+         minutes_from_start, 
+         sac, 
+         Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
+
+second.half <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
+summary(second.half)
+
+#plot for the intervals modeled separately
+ggplot(plateaus, 
+       aes(y = area.pct.change, x = med_pH, group = sac, colour = sac), 
+       lab.nb.digits = 4) +
+  geom_point(size = 2, col = "red") +
+  geom_smooth(method = "loess", se = T) +
+  theme_classic()
+
+#trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
+
+
+###########################       making combined data set      ###########################
+
+##  write/ lengthen .csv for the replicate experiments original write using 2022-08-24. Subsequently -> append to bottom 
+#write_csv(plateaus,
+          #"~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
+
+## open previously built .csv and append current data set to the bottom
+meta.plateaus <- read_csv("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis/meta.plateaus.csv")
+
+meta.plateaus <- rbind(meta.plateaus, plateaus)
+
+
+## use combined data set to replace original .csv
+write_csv(meta.plateaus,
+          "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
+
+
+
+
+
 
 
