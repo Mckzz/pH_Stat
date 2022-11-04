@@ -5,15 +5,17 @@ library(ggpubr)
 
 options(pillar.sigfig = 4)
 
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-11-01")
+
 ##################   sac areas .csv and image files with file times   #################
 areas <- 
-  read_csv("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/results.csv") %>%
+  read_csv("./results.csv") %>%
   mutate(...1 = NULL) %>%
   mutate(Mean = NULL)
 print(areas)
 
 # set working directory to folder with image files
-setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/images")
+setwd("./images")
 
 # get a list of all the image files to extract the times for
 jpg_files <- list.files(pattern ="*.jpg",
@@ -34,14 +36,14 @@ image.info <- data.frame(file.info(jpg_files)$ctime) %>%
                    times = (length(jpg_files) /4 ))) %>% 
   mutate(areas) %>%
   group_by(sac) %>%
-  mutate(area.pct.change = 
+  mutate(area.pct.change = ##  normalize to start of 1st plateau (not Area[1])
            ((Area - Area[1]) / Area[1]) * 100)
   
 
 head(image.info, n = 12)
 
 #####################        ASCII OCPs        ########################
-setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/pH")
+setwd("../pH")
 
 list_of_OCP.ascii <- # list of file names
   list.files(pattern = "\\.txt$",
@@ -87,7 +89,7 @@ head(combined, n = 12)
 
 ########################    for current cycle ascii files    #######################
 
-setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30 pressure/current")
+setwd("../current")
 
 current.files <- # list of file names
   list.files(pattern = "\\.txt$",
@@ -143,8 +145,8 @@ ggplot(data = combined,
   #geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
              #size = 4.4,
              #colour = "orangered3") +
-  #scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
-                                         #name = "pH", 
+ # scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
+                                        #name = "pH", 
                                          #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
   annotate("rect", xmin= current.times.table$current.start.time[1], 
            xmax= current.times.table$current.file.time[1], 
@@ -157,18 +159,15 @@ ggplot(data = combined,
            ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
   #geom_vline(xintercept = 117) +
   labs(x = "Minutes", 
-       y = "area % change") +
+       y = "% Change in Air-sac Area") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
   theme(legend.position = c(0.08, 0.4))
 
 
 
-
 ###############################   extract plateaus   ####################################
-
-######################      for plateaus against pH 
 
 # make the 4 plateaus and get a median pH column with no NAs
 plateau.1 <- combined %>%
@@ -200,13 +199,14 @@ plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
   na.omit() %>%
   group_by(sac) %>%
   mutate(med_pH = as_factor(med_pH)) %>%
-  #mutate(med_pH = as_factor(med_pH)) %>%
+  mutate(sac = as_factor(sac)) %>%
   mutate(day = "2022-08-30") %>% #COLUMN TO ID WHICH DAY'S EXPERIMENT THIS IS. to later allow appending of the other experiment days
   as_tibble()
 
 print(plateaus, n= 40)
 
-# mean and sd data frame for absolute areas and % changes as they change over the time within a plateau
+#####    plot where error bars show degree of sac size change within the time of the given plateau    #####
+# mean and sd data frame for sac size change (abs or %) over the time within a plateau
 plateaus.mean.sd <-
   plateaus %>%
   select(-minutes_from_start, -day) %>% 
@@ -216,7 +216,6 @@ plateaus.mean.sd <-
 
 print(plateaus.mean.sd, n= 40)
 
-# error bars show degree of sac size change within the time of the given plateau
 ggplot(data = plateaus.mean.sd, 
        aes(x= med_pH, 
            group = sac, 
@@ -231,7 +230,7 @@ ggplot(data = plateaus.mean.sd,
                 size = 0.5)
 
 
-# modeled slopes of sac size (% or abs) with pH
+# modeled slopes of sac size (% or abs) with pH, assumed linear
 ggplot(plateaus, aes(y = area.pct.change, x = med_pH, 
                      group = sac, 
                      colour = sac), 
@@ -250,7 +249,7 @@ w <- lm(area.pct.change ~ med_pH, data = plateaus)
 summary(w)
 
 
-#################   getting coeffs for sections eg. pH1 -- pH2, pH2 -- pH3... etc.     ###############
+#################   getting coeffs for individual intervals eg. pH1 -- pH2, pH2 -- pH3... etc.     ###############
 
 # make model to get the coefficients for the first interval of plateaus model plot
 plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
@@ -285,9 +284,10 @@ summary(second.half)
 
 #plot for the intervals modeled separately
 ggplot(plateaus, 
-       aes(y = area.pct.change, x = med_pH, group = sac, colour = sac), 
+       aes(y = area.pct.change, x = med_pH, 
+           group = sac, colour = sac), 
        lab.nb.digits = 4) +
-  geom_point(size = 2, col = "red") +
+  geom_point(size = 2) +
   geom_smooth(method = "loess", se = T) +
   theme_classic()
 
