@@ -24,6 +24,17 @@ jpg_files <- list.files(pattern ="*.jpg",
 
 print(jpg_files)
 
+############     a column made of values at plateau 1 repeated to the length of the following df    ################
+###################################     COMMENT OUT UNTIL YOU HAVE PLATEAU TIMES    #####################
+plat1 <- plateaus.mean.sd %>%
+  select(Area_mean) %>%
+  filter(plateau == "plateau1") %>%
+  rename(plat1.norm = Area_mean) %>%
+  as.data.frame() %>%
+  mutate(plateau = NULL) %>%
+  mutate(med_pH = NULL) %>%
+  slice(rep(1:n(), times = (length(jpg_files))))
+
 #make a data frame with image file creation times (time axis for data)
 image.info <- data.frame(file.info(jpg_files)$ctime) %>%
   rename(file.time = file.info.jpg_files..ctime) %>%
@@ -35,11 +46,13 @@ image.info <- data.frame(file.info(jpg_files)$ctime) %>%
   mutate(sac = rep(c("1","2","3","4"), # sac ID column, sacs/image repeated for #of images
                    times = (length(jpg_files) /4 ))) %>% 
   mutate(areas) %>%
+  mutate(plat1.norm = plat1$plat1.norm) %>% # has to be above grouping, COMMENT OUT UNTIL YOU HAVE PLATEAU TIMES
   group_by(sac) %>%
+  # mutate(area.pct.change =
+  #          ((Area - Area[1]) / Area[1]) * 100) # place holder to visualize data before I have plateaus
   mutate(area.pct.change = ##  normalize to start of 1st plateau (not Area[1])
-           ((Area - Area[1]) / Area[1]) * 100)
-  
-
+           ((Area - plat1.norm) / plat1.norm) * 100)
+      
 head(image.info, n = 12)
 
 #####################        ASCII OCPs        ########################
@@ -141,10 +154,10 @@ ggplot(data = combined,
   geom_point(aes(y= area.pct.change)) +
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
-  #scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
-  #geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
-             #size = 4.4,
-             #colour = "orangered3") +
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
+  geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
+             size = 4.4,
+             colour = "orangered3") +
  # scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
                                         #name = "pH", 
                                          #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
@@ -157,41 +170,54 @@ ggplot(data = combined,
   annotate("rect", xmin= current.times.table$current.start.time[3], 
            xmax= current.times.table$current.file.time[3], 
            ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
-  #geom_vline(xintercept = 117) +
+  #geom_vline(xintercept = 603.4333) +
   labs(x = "Minutes", 
        y = "% Change in Air-sac Area") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 20)) +
-  theme(legend.position = c(0.08, 0.4))
-
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
+  theme(legend.position = c(0.08, 0.2))
 
 
 ###############################   extract plateaus   ####################################
 
 # make the 4 plateaus and get a median pH column with no NAs
 plateau.1 <- combined %>%
-  filter(minutes_from_start > 400, minutes_from_start < 440) %>%
+  filter(minutes_from_start > 340, minutes_from_start < 410) %>%
   mutate(plateau = "plateau1") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.2 <- combined %>%
-  filter(minutes_from_start > 480, minutes_from_start < 550) %>%
+  filter(minutes_from_start > 440, minutes_from_start < 475) %>%
   mutate(plateau = "plateau2") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.3 <- combined %>%
-  filter(minutes_from_start > 600, minutes_from_start < 685) %>%
+  filter(minutes_from_start > 520, minutes_from_start < 555) %>%
   mutate(plateau = "plateau3") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.4 <- combined %>%
-  filter(minutes_from_start > 700, minutes_from_start < 800) %>%
+  filter(minutes_from_start > 575, minutes_from_start < 605) %>%
   mutate(plateau = "plateau4") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 
-head(plateau.3)
+### make med_pH for plateau.1 the med starting pH, even though there isnt an OCP during the plateau it's self (it's very stable though)    ########
+##############   FOR WHEN THERE ISN'T A pH MEASURE RIGHT DURING THE FIRST PLATEAU  (use previous measure)  #############
+##############          OTHERWISE, COMMENT THIS OUT        #############
+start.pH <- combined %>%
+  select(pH) %>%
+  na.omit() %>%
+  mutate(start_pH = median(pH[1:6]))
+
+print(start.pH)
+
+plateau.1 <- plateau.1 %>%
+  mutate(med_pH = start.pH$start_pH[1])
+
+head(plateau.1)
+
 
 # combine the plateaus and remove NAs from the other columns
 plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
@@ -200,7 +226,8 @@ plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
   group_by(sac) %>%
   mutate(med_pH = as_factor(med_pH)) %>%
   mutate(sac = as_factor(sac)) %>%
-  mutate(day = "2022-08-30") %>% #COLUMN TO ID WHICH DAY'S EXPERIMENT THIS IS. to later allow appending of the other experiment days
+  mutate(day = as.character(combined$file.time[1])) %>% #COLUMN TO ID WHICH DAY'S EXPERIMENT THIS IS. to later allow appending of the other experiment days
+  mutate(day = substr(day, 1, nchar(day)-9)) %>% # drop h/min/sec
   as_tibble()
 
 print(plateaus, n= 40)
@@ -264,8 +291,8 @@ plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
   #mutate(med_pH = as_factor(med_pH)) %>%
   as_tibble()
 
-first.half <- lm(area.pct.change ~ med_pH, data = plateaus.1.2)
-summary(first.half)
+# first.interval <- lm(area.pct.change ~ med_pH, data = plateaus.1.2)
+# summary(first.half)
 
 # make model to get the coefficients for the second interval of plateaus model plot
 plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
@@ -279,8 +306,22 @@ plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
   #mutate(med_pH = as_factor(med_pH)) %>%
   as_tibble()
 
-second.half <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
-summary(second.half)
+#second.interval <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
+#summary(second.half)
+
+plateaus.3.4 <- rbind(plateau.3, plateau.4) %>%
+  select(plateau, 
+         med_pH, 
+         minutes_from_start, 
+         sac, 
+         Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  #mutate(med_pH = as_factor(med_pH)) %>%
+  as_tibble()
+
+#third.interval <- lm(area.pct.change ~ med_pH, data = plateaus.3.4)
+#summary(second.half)
 
 #plot for the intervals modeled separately
 ggplot(plateaus, 
@@ -296,9 +337,10 @@ ggplot(plateaus,
 
 ###########################       making combined data set      ###########################
 
-##  write/ lengthen .csv for the replicate experiments original write using 2022-08-24. Subsequently -> append to bottom 
-#write_csv(plateaus,
-          #"~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
+########  write/ lengthen .csv for replicate experiments. Original write using 2022-08-24. Subsequently, append to bottom 
+
+# write_csv(plateaus,
+# "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
 
 ## open previously built .csv and append current data set to the bottom
 meta.plateaus <- read_csv("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis/meta.plateaus.csv")
