@@ -5,7 +5,7 @@ library(ggpubr)
 
 options(pillar.sigfig = 4)
 
-setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-05")
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-21")
 
 #################   sac areas .csv and image files with file times   #################
 areas <-
@@ -37,8 +37,8 @@ image.info <- data.frame(file.info(jpg_files)$mtime) %>%
   mutate(areas) %>%
   group_by(sac) %>%
   mutate(area.pct.change =
-           ((Area - Area[1]) / Area[1]) * 100) %>%
-  filter(sac == "3" | sac == "1") # remove sacs 2 and 4 (FOR UNANALYZABLE SACS)
+           ((Area - Area[1]) / Area[1]) * 100) #%>%
+  #filter(sac == "2" | sac == "3" | sac == "4") # remove sac 1 (FOR UNANALYZABLE SAC, 2022-12-20)
 
 head(image.info, n = 12)
 
@@ -63,7 +63,7 @@ OCPs.df <- read_delim(list_of_OCP.ascii,
   mutate(OCP.files = substr(OCP.files, 1, nchar(OCP.files)-4)) %>% #drop file extension so that OCPs can relate to image file times
   group_by(OCP.files) %>%
   mutate(median_V = median(V)) %>%
-  mutate(pH = (median_V + 0.3582)/0.054) %>% # Volts to pH
+  mutate(pH = (median_V + 0.3579)/0.054) %>% # Volts to pH 2022-12-21
   mutate(exp_start = (image.info$seconds[1])) %>% #1st image POSIX time
   mutate(minutes_from_start =        # time point of pH measurement relative to image file times
            ((OCP.file.seconds ## the end of an OCP run
@@ -144,7 +144,7 @@ ggplot(data = combined,
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
-  geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
+  geom_point(aes(y= (pH *22) -145.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
              size = 4.4,
              colour = "orangered3") +
   # scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
@@ -152,13 +152,13 @@ ggplot(data = combined,
   #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
   annotate("rect", xmin= current.times.table$current.start.time[1],
            xmax= current.times.table$current.file.time[1],
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[2],
            xmax= current.times.table$current.file.time[2],
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[3],
            xmax= current.times.table$current.file.time[3],
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
   # geom_vline(xintercept = 603.4333) +
   labs(x = "Minutes", 
        y = "% Change in Air-sac Area") +
@@ -170,32 +170,29 @@ ggplot(data = combined,
 
 ###############################   extract plateaus   ####################################
 
-# make the 4 plateaus and get a median pH column with no NAs 2022-11-01
+# make the 4 plateaus and get a median pH column with no NAs 2022-12-21
 plateau.1 <- combined %>%
-  filter(minutes_from_start > 320, minutes_from_start < 360) %>%
+  filter(minutes_from_start > 300, minutes_from_start < 360) %>%
   mutate(plateau = "plateau1") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.2 <- combined %>%
-  filter(minutes_from_start > 380, minutes_from_start < 420) %>%
+  filter(minutes_from_start > 380, minutes_from_start < 440) %>%
   mutate(plateau = "plateau2") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
 plateau.3 <- combined %>%
-  filter(minutes_from_start > 500, minutes_from_start < 540) %>%
+  filter(minutes_from_start > 460, minutes_from_start < 530) %>%
   mutate(plateau = "plateau3") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
-plateau.4 <- combined %>%
-  filter(minutes_from_start > 580, minutes_from_start < 620) %>%
-  mutate(plateau = "plateau4") %>%
-  mutate(med_pH = median(pH, na.rm = T)) %>%
-  as_tibble()
+
+
 
 
 ### make med_pH for plateau.1 the med starting pH, even though there isnt an OCP during the plateau it's self (it's very stable though)    ########
 ##############   FOR WHEN THERE ISN'T A pH MEASURE RIGHT DURING THE FIRST PLATEAU  (use previous measure)  #############
-##############          OTHERWISE, COMMENT THIS OUT        #############
+##############          OTHERWISE, COMMENT THIS OUT    #########    for 2022-11-01    #############
 # start.pH <- combined %>%
 #   select(pH) %>%
 #   na.omit() %>%
@@ -210,7 +207,7 @@ plateau.4 <- combined %>%
 
 
 # combine the plateaus and remove NAs from the other columns
-plateaus <- rbind(plateau.1, plateau.2, plateau.3, plateau.4) %>%
+plateaus <- rbind(plateau.1, plateau.2, plateau.3) %>%
   select(plateau, med_pH, minutes_from_start, sac, Area, area.pct.change) %>%
   na.omit() %>%
   group_by(sac) %>%
@@ -299,25 +296,25 @@ plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
 #second.interval <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
 #summary(second.half)
 
-plateaus.3.4 <- rbind(plateau.3, plateau.4) %>%
-  select(plateau, 
-         med_pH, 
-         minutes_from_start, 
-         sac, 
-         Area, area.pct.change) %>%
-  na.omit() %>%
-  group_by(sac) %>%
-  #mutate(med_pH = as_factor(med_pH)) %>%
-  as_tibble()
+# plateaus.3.4 <- rbind(plateau.3, plateau.4) %>%
+#   select(plateau, 
+#          med_pH, 
+#          minutes_from_start, 
+#          sac, 
+#          Area, area.pct.change) %>%
+#   na.omit() %>%
+#   group_by(sac) %>%
+#   #mutate(med_pH = as_factor(med_pH)) %>%
+#   as_tibble()
 
-#third.interval <- lm(area.pct.change ~ med_pH, data = plateaus.3.4)
-#summary(second.half)
-
-#plot for the intervals modeled separately
-ggplot(plateaus, 
-       aes(y = area.pct.change, x = med_pH, 
-           group = sac, colour = sac), 
-       lab.nb.digits = 4) +
-  geom_point(size = 2) +
-  geom_smooth(method = "loess", se = T) +
-  theme_classic()
+# #third.interval <- lm(area.pct.change ~ med_pH, data = plateaus.3.4)
+# #summary(second.half)
+# 
+# #plot for the intervals modeled separately
+# ggplot(plateaus, 
+#        aes(y = area.pct.change, x = med_pH, 
+#            group = sac, colour = sac), 
+#        lab.nb.digits = 4) +
+#   geom_point(size = 2) +
+#   geom_smooth(method = "loess", se = T) +
+#   theme_classic()
