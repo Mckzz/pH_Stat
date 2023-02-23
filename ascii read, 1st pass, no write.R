@@ -38,7 +38,9 @@ image.info <- data.frame(file.info(jpg_files)$mtime) %>%
   group_by(sac) %>%
   mutate(area.pct.change =
            ((Area - Area[1]) / Area[1]) * 100) #%>%
-  #filter(sac == "2" | sac == "3" | sac == "4") # remove sac 1 (FOR UNANALYZABLE SAC, 2022-12-20)
+  #filter(sac == "1" | sac == "3") # %>% # remove sacs 2 and 3 (FOR UNANALYZABLE SACs, 2022-12-05)
+  #filter(sac != "1")  # remove sac 1 (FOR UNANALYZABLE SAC, 2022-12-20)
+  
 
 head(image.info, n = 12)
 
@@ -190,9 +192,11 @@ plateau.3 <- combined %>%
 
 
 
+
+
 ### make med_pH for plateau.1 the med starting pH, even though there isnt an OCP during the plateau it's self (it's very stable though)    ########
 ##############   FOR WHEN THERE ISN'T A pH MEASURE RIGHT DURING THE FIRST PLATEAU  (use previous measure)  #############
-##############          OTHERWISE, COMMENT THIS OUT    #########    for 2022-11-01    #############
+#############          OTHERWISE, COMMENT THIS OUT      #########      for 2022-11-01     #############
 # start.pH <- combined %>%
 #   select(pH) %>%
 #   na.omit() %>%
@@ -266,49 +270,19 @@ summary(w)
 #################   getting coeffs for individual intervals eg. pH1 -- pH2, pH2 -- pH3... etc.     ###############
 
 # make model to get the coefficients for the first interval of plateaus model plot
-plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
-  select(plateau, 
-         med_pH, 
-         minutes_from_start, 
-         sac, 
-         Area, 
-         area.pct.change) %>%
-  na.omit() %>%
-  group_by(sac) %>%
-  #mutate(med_pH = as_factor(med_pH)) %>%
-  as_tibble()
-
-# first.interval <- lm(area.pct.change ~ med_pH, data = plateaus.1.2)
-# summary(first.half)
-
-# make model to get the coefficients for the second interval of plateaus model plot
-plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
-  select(plateau, 
-         med_pH, 
-         minutes_from_start, 
-         sac, 
-         Area, area.pct.change) %>%
-  na.omit() %>%
-  group_by(sac) %>%
-  #mutate(med_pH = as_factor(med_pH)) %>%
-  as_tibble()
-
-#second.interval <- lm(area.pct.change ~ med_pH, data = plateaus.2.3)
-#summary(second.half)
-
-# plateaus.3.4 <- rbind(plateau.3, plateau.4) %>%
+# plateaus.1.2 <- rbind(plateau.1, plateau.2) %>%
 #   select(plateau, 
 #          med_pH, 
 #          minutes_from_start, 
 #          sac, 
-#          Area, area.pct.change) %>%
+#          Area, 
+#          area.pct.change) %>%
 #   na.omit() %>%
 #   group_by(sac) %>%
 #   #mutate(med_pH = as_factor(med_pH)) %>%
 #   as_tibble()
 
-# #third.interval <- lm(area.pct.change ~ med_pH, data = plateaus.3.4)
-# #summary(second.half)
+
 # 
 # #plot for the intervals modeled separately
 # ggplot(plateaus, 
@@ -318,3 +292,5 @@ plateaus.2.3 <- rbind(plateau.2, plateau.3) %>%
 #   geom_point(size = 2) +
 #   geom_smooth(method = "loess", se = T) +
 #   theme_classic()
+
+

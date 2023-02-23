@@ -155,7 +155,7 @@ ggplot(data = combined,
   theme(legend.position = c(0.08, 0.2))
 
 
-###############################   extract plateaus   ####################################
+###############################   extract plateaus   #################################### (needed on both 1st and 2nd pass)
 
 # make the 4 plateaus and get a median pH column with no NAs 2022-12-21
 plateau.1 <- combined %>%
@@ -179,7 +179,7 @@ plateau.3 <- combined %>%
 
 ### make med_pH for plateau.1 the med starting pH, even though there isnt an OCP during the plateau it's self (it's very stable though)    ########
 ##############   FOR WHEN THERE ISN'T A pH MEASURE RIGHT DURING THE FIRST PLATEAU  (use previous measure)  #############
-##############          OTHERWISE, COMMENT THIS OUT        #############
+#############          OTHERWISE, COMMENT THIS OUT      #########      for 2022-11-01   (needed on both 1st and 2nd pass)  #############
 # start.pH <- combined %>%
 #   select(pH) %>%
 #   na.omit() %>%
@@ -193,8 +193,19 @@ plateau.3 <- combined %>%
 # head(plateau.1)
 
 
-# combine the plateaus and remove NAs from the other columns
 
+# combine the plateaus and remove NAs from the other columns (needed on both 1st and 2nd pass)
+plateaus <- rbind(plateau.1, plateau.2, plateau.3) %>%
+  select(plateau, med_pH, minutes_from_start, sac, Area, area.pct.change) %>%
+  na.omit() %>%
+  group_by(sac) %>%
+  mutate(med_pH = as_factor(med_pH)) %>%
+  mutate(sac = as_factor(sac)) %>%
+  mutate(day = as.character(combined$file.time[1])) %>% #COLUMN TO ID WHICH DAY'S EXPERIMENT THIS IS. to later allow appending of the other experiment days
+  mutate(day = substr(day, 1, nchar(day)-9)) %>% # drop h/min/sec
+  as_tibble()
+
+print(plateaus, n= 40)
 
 
 #trace(ggpubr:::.stat_lm, edit = TRUE) #line 14 specifies the significant digits
@@ -203,8 +214,6 @@ plateau.3 <- combined %>%
 ###########################       making combined data set      ###########################
 
 ########  write/ lengthen .csv for replicate experiments. Original write using 2022-08-24. Subsequently, append to bottom 
-
-
 # write_csv(plateaus,
 # "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
 
@@ -217,16 +226,29 @@ print(meta.plateaus)
 
 meta.plateaus <- rbind(meta.plateaus, plateaus)
 
-
 ## use combined data set to replace original .csv
 write_csv(meta.plateaus,
           "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\meta.plateaus.csv")
 
 
+###################                      remove mismade rows
+# meta.plateaus <- meta.plateaus %>%
+#   filter(day != "2022-11-01")
+
+
+
 
 #####################################################################################################
 ##  for all together
+#####################################################################################################
 
+## remove troublesome bits from the end
+# meta.plateaus <- meta.plateaus %>%
+#   filter(day != "2022-12-05")
+
+
+
+# For once all data is in, add a larva ID column using this sheet in the next code block
 ids <- read_csv("../../ids.csv")
 
 # get indvd and IDs, and get means for a meta plot. 
@@ -261,14 +283,14 @@ print(metaplats_ids)
 
 ggplot(metaplats_ids, 
        aes(y = plat.areapct.mean, x = plat.pH.mean, 
-           group = species, colour = species, ), 
+           group = species, colour = species, shape = indvd), 
        lab.nb.digits = 4) +
-  #geom_jitter(size = 3, width = 0.02) +
-  #scale_shape_manual(values=c(0, 1, 2, 6, 7, 9)) +
+  geom_jitter(size = 3, width = 0.02) +
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11)) +
   geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
   scale_color_manual(values=c("#D55E00", "#009e73")) +
   theme_classic() +
-  ylim(-1, 20) +
+  #ylim(-1, 20) +
   theme(legend.position = c(0.2, 0.7))
 
 
@@ -295,5 +317,203 @@ ggplot(metaplats_ids,
   #               size = 0.5)
   theme_classic() +
   theme(legend.position = c(0.2, 0.7))
+
+
+
+z <- lm(plat.areapct.mean ~ plat.pH.mean * species, data = metaplats_ids)
+summary(z)
+anova(z)
+
+install.packages("lmerTest")
+library(lmerTest)
+
+y <- lmer()
+
+
+
+
+#############     getting a value for airsac width averaged over the 1st plateau    ##############
+#########   for use in creating a linearized index based on area
+
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-24")
+
+# initially create this data frame using the first experiment
+plat1_widths_raw_2022.08.24 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1:4), times = 4)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:4), each = 4)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.08.24)
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-30")
+
+plat1_widths_raw_2022.08.30 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1:4), times = 3)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:3), each = 4)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.08.30)
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-10-29")
+
+plat1_widths_raw_2022.10.29 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1:4), times = 9)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:9), each = 4)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.10.29)
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-11-01")
+
+plat1_widths_raw_2022.11.01 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1:4), times = 5)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:5), each = 4)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.11.01)
+
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-05")
+
+plat1_widths_raw_2022.12.05 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1, 3), times = 4)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:4), each = 2)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.12.05)
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-20")
+
+plat1_widths_raw_2022.12.20 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(2, 3, 4), times = 7)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:7), each = 3)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.12.20)
+
+# next expt
+setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-21")
+
+plat1_widths_raw_2022.12.21 <- read_csv("./Results_plat1.width.csv") %>%
+  mutate(...1 = NULL) %>%
+  mutate(Area = NULL) %>%
+  mutate(Angle = NULL) %>%
+  rename(width = Length) %>%
+  mutate(sac = rep(c(1:4), times = 6)) %>% # of sacs in an image, times = # of images
+  mutate(plat1_image = rep(c(1:6), each = 4)) %>% # of images, times = # of sacs in an image
+  group_by(sac) %>%
+  mutate(mean_width = mean(width)) %>%
+  mutate(day = as.Date(basename(getwd())))
+
+print(plat1_widths_raw_2022.12.21)
+
+
+
+# make lengthened plat1_widths_raw with all the experiments
+plat1_width_means <- rbind(plat1_widths_raw_2022.08.24,
+                           plat1_widths_raw_2022.08.30,
+                           plat1_widths_raw_2022.10.29,
+                           plat1_widths_raw_2022.11.01,
+                           plat1_widths_raw_2022.12.05,
+                           plat1_widths_raw_2022.12.20,
+                           plat1_widths_raw_2022.12.21)%>%
+  mutate(width = NULL) %>%
+  mutate(plat1_image = NULL) %>%
+  mutate(sac = as.character(sac)) %>%
+  unique()
+
+print(plat1_width_means, n = 25)
+
+
+
+# plat.area.mean is an absolute area. you want change in area without going to %ages. 
+# Linearize first? (plat.area.mean / mean_width)
+# 
+# create linearized measure column using widths
+metaplats_ids.diam <- left_join(metaplats_ids, 
+                                plat1_width_means, 
+                                by = c("day", 
+                                       "sac")) %>%
+  mutate(lin_area = plat.area.mean / mean_width) %>% # aspect is a linearized area
+  group_by(day, sac) %>%
+  mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
+  mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
+  mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
+  mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
+  mutate(sac.work = sac.force * lin_area_change) # F * D
+
+print(metaplats_ids.diam)
+
+
+
+
+
+# indvds sampled as meany times per plateau pH as there are images for that plateau
+ggplot(metaplats_ids.diam, 
+       aes(y = aspect.pct.change, x = plat.pH.mean, 
+           group = species, colour = species, shape = indvd), 
+       lab.nb.digits = 4) +
+  geom_jitter(size = 3, width = 0.02) +
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13)) +
+  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
+  scale_color_manual(values=c("#D55E00", "#009e73")) +
+  theme_classic() +
+  #ylim(-1, 20) +
+  theme(legend.position = c(0.2, 0.7))
+
+
+# indvds sampled as meany times per plateau pH as there are images for that plateau
+ggplot(metaplats_ids.diam, 
+       aes(y = sac.work, x = plat.pH.mean, 
+           group = species, colour = species, shape = indvd), 
+       lab.nb.digits = 4) +
+  geom_jitter(size = 3, width = 0.02) +
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13)) +
+  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
+  scale_color_manual(values=c("#D55E00", "#009e73")) +
+  theme_classic() +
+  #ylim(-1, 20) +
+  theme(legend.position = c(0.2, 0.6))
 
 
