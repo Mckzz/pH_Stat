@@ -320,7 +320,7 @@ ggplot(metaplats_ids,
 
 
 
-z <- lm(plat.areapct.mean ~ plat.pH.mean * species, data = metaplats_ids)
+z <- lm(plat.areapct.mean ~ plat.pH.mean + species, data = metaplats_ids)
 summary(z)
 anova(z)
 
@@ -481,7 +481,22 @@ metaplats_ids.diam <- left_join(metaplats_ids,
   mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
   mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
   mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
-  mutate(sac.work = sac.force * lin_area_change) # F * D
+  mutate(sac.work = sac.force * lin_area_change) %>% # F * D
+  mutate(species = as.factor(species)) %>%
+  mutate(pH.fct = as.factor(plat.pH.mean)) %>%
+  ungroup() %>%
+  group_by(indvd, sac) %>%
+  mutate(area.start = plat.area.mean[1]) %>% # make starting area column for normalization test
+  #mutate(norm.work = sac.work / (((mean_width / 2)^2) * pi))
+  mutate(norm.work = sac.work / area.start)
+  
+## Normalizing by the force producing area doesn't seem to change the relationship between 
+## the two species much. BUT normalizing to starting area does eliminate some BUT NOT ALL
+## of the of the difference!! Could it be said that, normalizing by starting area should eliminate 
+## general sac size related differences in work production? Any remaining differences 
+## should be due to either resilin-cuticle arrangement (including resilin amount), 
+## or resilin pH sensitivity??????????????
+####################      good thing to talk to Bob about?
 
 print(metaplats_ids.diam)
 
@@ -504,8 +519,9 @@ ggplot(metaplats_ids.diam,
 
 
 # indvds sampled as meany times per plateau pH as there are images for that plateau
+# jittered with shape for individual
 ggplot(metaplats_ids.diam, 
-       aes(y = sac.work, x = plat.pH.mean, 
+       aes(y = norm.work, x = plat.pH.mean, 
            group = species, colour = species, shape = indvd), 
        lab.nb.digits = 4) +
   geom_jitter(size = 3, width = 0.02) +
@@ -514,6 +530,211 @@ ggplot(metaplats_ids.diam,
   scale_color_manual(values=c("#D55E00", "#009e73")) +
   theme_classic() +
   #ylim(-1, 20) +
-  theme(legend.position = c(0.2, 0.6))
+  theme(legend.position = NULL) #+
+  #theme(legend.position = c(0.2, 0.6))
 
+# indvds sampled as meany times per plateau pH as there are images for that plateau
+# jittered shape for species
+ggplot(metaplats_ids.diam, 
+       aes(y = norm.work, x = plat.pH.mean, 
+           group = species, colour = species), 
+       lab.nb.digits = 4) +
+  geom_jitter(size = 4, shape = 1, width = 0.01) +
+  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
+  scale_color_manual(values=c("#D55E00", "#009e73")) +
+  annotate("rect", xmin = metaplats_ids.diam$plat.pH.mean - metaplats_ids.diam$plat.pH.sd, 
+           xmax = metaplats_ids.diam$plat.pH.mean + metaplats_ids.diam$plat.pH.sd, 
+           ymin = -30, ymax = -25, fill = "black") +
+  theme_classic() +
+  #ylim(-1, 20) +
+  theme(legend.position = NULL) +
+  theme(axis.ticks.length=unit(-0.1, "cm")) #+
+  #theme(legend.position = c(0.2, 0.6))
+
+
+
+library(lme4)
+model <- lmer(sac.work ~ pH.fct + (species | pH.fct), data = metaplats_ids.diam)
+
+summary(model)
+coef(model)
+metaplats_ids.diam$fit <- predict(model)   #Add model fits to dataframe
+
+anova(model)
+
+fit <- predict(model)   #Add model fits to dataframe
+conf <- VarCorr(model)
+
+plot(model)
+
+
+# new package stuff
+merTools()
+
+
+
+# simple model. sac.work predicted by categorical variable species (random effect)... 
+# and by continuous variable plat.pH.mean
+model2 <- lmer(sac.work ~ (1 | species) + pH.fct, data = metaplats_ids.diam)
+summary(model2)
+confint(model2, level = 0.95)
+metaplats_ids.diam$fit2 <- predict(model2, se.fit = T)   #Add model fits to dataframe
+
+
+# indvds sampled as meany times per plateau pH as there are images for that plateau
+# jittered shape for species
+# for black and white (YSAS)
+ggplot(metaplats_ids.diam, 
+       aes(y = sac.work, x = plat.pH.mean, 
+           group = species, shape = species), 
+       lab.nb.digits = 4) +
+  geom_jitter(size = 4, width = 0.01) +
+  #geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
+  geom_line(aes(y = fit)) +
+  scale_shape_manual(values=c(1, 6)) +
+  annotate("rect", xmin = metaplats_ids.diam$plat.pH.mean - metaplats_ids.diam$plat.pH.sd, 
+           xmax = metaplats_ids.diam$plat.pH.mean + metaplats_ids.diam$plat.pH.sd, 
+           ymin = -30, ymax = -25, fill = "black") +
+  theme_classic() +
+  #ylim(-1, 20) +
+  theme(legend.position = NULL) +
+  theme(axis.ticks.length=unit(-0.1, "cm")) #+
+#theme(legend.position = c(0.2, 0.6))
+
+hist(metaplats_ids.diam$sac.work)
+
+
+
+
+# with just straight lines and all data assumed to be linear
+ggplot(metaplats_ids.diam, 
+       aes(y = sac.work, x = plat.pH.mean, 
+           group = species, shape = species))  + 
+  #geom_smooth(data = metaplats_ids.diam, method = "lm", formula = sac.work ~ plat.pH.mean + (sac.work | species)) +
+  geom_smooth(method = "lm", se = T, span = 0.8) +
+  #geom_line() + 
+  geom_point()
+       
+
+
+smaller.data.frame <- metaplats_ids.diam %>%
+  ungroup() %>%
+  select(species, pH.fct, sac.work) %>%
+  rename(pH = pH.fct) %>%
+  rename(y = sac.work)
+
+
+print(smaller.data.frame, n= 75)    
+
+    
+write_csv(smaller.data.frame,
+          "~/student_documents/UBC/Research/pH_stat/smaller.data.csv")
+    
+
+
+#try logging y
+
+
+setwd("~/student_documents/UBC/Research/pH_stat")
+
+sac <- read.csv("smaller.data.csv")
+sac$species <- as.factor(sac$species)
+sac$pH <- as.numeric(sac$pH)
+
+library(lmerTest)
+mod1 <- lm(y ~ pH, sac)
+mod2 <- lmer(y ~ pH + (species | pH), sac)
+
+# predict function for bootstrapping
+predfn <- function(.) {
+  predict(., newdata=new, re.form=NULL)
+}
+
+# summarise output of bootstrapping
+sumBoot <- function(merBoot) {
+  return(
+    data.frame(fit = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.5, na.rm=TRUE))),
+               lwr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.025, na.rm=TRUE))),
+               upr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.975, na.rm=TRUE)))
+    )
+  )
+}
+
+# Bootstrapped
+new <- sac # the bootMer function uses the df "new" for data
+boot <- lme4::bootMer(mod2, predfn, nsim=250, use.u=TRUE, type="parametric")
+
+sac <- cbind(sac, dplyr::bind_cols(sumBoot(boot)))
+
+# add pH sd column from metaplats_ids.diam
+sac$pH.sd <- metaplats_ids.diam$plat.pH.sd
+
+ggplot(data = sac,
+       aes(x = pH,
+           y = y,
+           shape = species)) +
+  scale_shape_manual(values=c(1, 6)) +
+  geom_jitter(size = 4, width = 0.01) +
+  #geom_abline(slope = fit_lm$coefficients[2], intercept = fit_lm$coefficients[1]) +
+  #geom_abline(slope = ranef(mod2)$pH[[2]], intercept = ranef(mod2)$pH[[1]]) +
+  geom_line(aes(x = pH, y = fit), show.legend = FALSE) +
+  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, show.legend = FALSE) +
+  annotate("rect",
+           xmin = sac$pH - sac$pH.sd,
+           xmax = sac$pH + sac$pH.sd,
+           ymin = -40, ymax = -35, fill = "black") +
+  theme_classic() +
+  theme(axis.ticks.length=unit(-0.1, "cm"))
+
+
+# stats
+# anova(mod2)
+# summary(mod2)
+
+# compare the two species as well
+# mod_am <- lm(y ~ pH, sac[sac$species == "americanus", ])
+# mod_tr <- lm(y ~ pH, sac[sac$species == "trivittatus", ])
+
+#  make pH a factor for anova
+sac <- sac %>%
+  mutate(pH = as.factor(pH))
+
+mod3 <- aov(y ~ pH * species, sac)
+predict(mod3)
+confint(mod3)
+
+summary(mod3)
+TukeyHSD(mod3)
+
+
+## for t test, split up species then do in excel lol
+sac.trivt <- sac %>% 
+  filter(species == "trivittatus")
+  
+write_csv(sac.trivt, 
+            "~/student_documents/UBC/Research/pH_stat/sac.trivit.csv")
+
+sac.am <- sac %>% 
+  filter(species == "americanus")
+
+write_csv(sac.am, 
+          "~/student_documents/UBC/Research/pH_stat/sac.am.csv")
+
+## bootstrapoped 95 CI from a linear mixed effect
+## large variance for species indicates that random effect for that is appropriate
+
+
+
+## quadratic as evidenced by the AIC shit Sarah P did
+ggplot(data = sac,
+       aes(x = as.numeric(pH),
+           y = y,
+           shape = species)) +
+  geom_point() +
+  geom_smooth(method = "lm", 
+              formula = y ~ (x + I(x^2)),
+              color = '#555555') +
+  #geom_line(aes(x = pH, y = fit), show.legend = FALSE) +
+  #geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, show.legend = FALSE) +
+  theme_minimal()
 
