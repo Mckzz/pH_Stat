@@ -491,7 +491,7 @@ metaplats_ids.diam <- left_join(metaplats_ids,
   mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
   mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
   mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
-  mutate(plat_length_means = mean_plat1.length * (plat.areapct.mean/100) + 1) %>% # length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
+  mutate(plat_length_means = mean_plat1.length * ((plat.areapct.mean/100) + 1)) %>% # length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
   mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
   mutate(sac.work = sac.force * lin_area_change) %>% # F * D
   mutate(species = as.factor(species)) %>%
