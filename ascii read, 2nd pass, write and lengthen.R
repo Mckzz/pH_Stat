@@ -335,6 +335,8 @@ y <- lmer()
 #############     getting a value for airsac width averaged over the 1st plateau    ##############
 #########   for use in creating a linearized index based on area
 
+#############     also now adding measured sac length
+
 setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-08-24")
 
 # initially create this data frame using the first experiment
@@ -347,6 +349,7 @@ plat1_widths_raw_2022.08.24 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:4), each = 4)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.08.24)
@@ -363,6 +366,7 @@ plat1_widths_raw_2022.08.30 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:3), each = 4)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.08.30)
@@ -379,6 +383,7 @@ plat1_widths_raw_2022.10.29 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:9), each = 4)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.10.29)
@@ -395,6 +400,7 @@ plat1_widths_raw_2022.11.01 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:5), each = 4)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.11.01)
@@ -412,6 +418,7 @@ plat1_widths_raw_2022.12.05 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:4), each = 2)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.12.05)
@@ -428,6 +435,7 @@ plat1_widths_raw_2022.12.20 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:7), each = 3)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.12.20)
@@ -444,6 +452,7 @@ plat1_widths_raw_2022.12.21 <- read_csv("./Results_plat1.width.csv") %>%
   mutate(plat1_image = rep(c(1:6), each = 4)) %>% # of images, times = # of sacs in an image
   group_by(sac) %>%
   mutate(mean_width = mean(width)) %>%
+  mutate(mean_plat1.length = mean(sac_length)) %>%
   mutate(day = as.Date(basename(getwd())))
 
 print(plat1_widths_raw_2022.12.21)
@@ -451,6 +460,7 @@ print(plat1_widths_raw_2022.12.21)
 
 
 # make lengthened plat1_widths_raw with all the experiments
+#######      NOW ALSO WITH LENGTHS       ########
 plat1_width_means <- rbind(plat1_widths_raw_2022.08.24,
                            plat1_widths_raw_2022.08.30,
                            plat1_widths_raw_2022.10.29,
@@ -459,6 +469,7 @@ plat1_width_means <- rbind(plat1_widths_raw_2022.08.24,
                            plat1_widths_raw_2022.12.20,
                            plat1_widths_raw_2022.12.21)%>%
   mutate(width = NULL) %>%
+  mutate(sac_length = NULL) %>%
   mutate(plat1_image = NULL) %>%
   mutate(sac = as.character(sac)) %>%
   unique()
@@ -480,6 +491,7 @@ metaplats_ids.diam <- left_join(metaplats_ids,
   mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
   mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
   mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
+  mutate(plat_length_means = mean_plat1.length * (plat.areapct.mean/100) + 1) %>% # length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
   mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
   mutate(sac.work = sac.force * lin_area_change) %>% # F * D
   mutate(species = as.factor(species)) %>%

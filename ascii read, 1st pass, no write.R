@@ -5,6 +5,8 @@ library(ggpubr)
 
 options(pillar.sigfig = 4)
 
+#setwd("~/student_documents/UBC/Research/pH_stat/reverse (no e-)\\2023-05-31, pilot with two trivits, one NEMed")
+
 setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\2022-12-21")
 
 #################   sac areas .csv and image files with file times   #################
@@ -31,8 +33,8 @@ image.info <- data.frame(file.info(jpg_files)$mtime) %>%
   arrange(file.time) %>% #arrange by time of file creation
   mutate(seconds = as.numeric(file.time)) %>% #seconds from arbitrary date (POSIX)
   mutate(minutes_from_start = (seconds - seconds[1])/60) %>%
-  slice(rep(1:n(), each = 4)) %>% # repeat rows for the number of sacs in each image
-  mutate(sac = rep(c("1","2","3","4"), # sac ID column, sacs/image repeated for #of images
+  slice(rep(1:n(), each = 4)) %>% # repeat rows for the number of sacs in each image ####### ####### ######## ########
+  mutate(sac = rep(c("1","2","3","4"), # sac ID column, sacs/image repeated for #of images ####### ####### ######## ########
                    times = (length(jpg_files) /4 ))) %>% 
   mutate(areas) %>%
   group_by(sac) %>%
@@ -138,36 +140,36 @@ head(current.times.table)
 
 ########################     plotting    ########################
 
-ggplot(data = combined, 
+ggplot(data = image.info, 
        aes(x= minutes_from_start, 
            group = sac, 
            colour= sac)) +
-  geom_point(aes(y= area.pct.change)) +
-  geom_line(aes(y= area.pct.change)) +
+  geom_point(aes(y= Area)) +
+  geom_line(aes(y= Area)) +
   scale_colour_discrete(na.translate = F) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
-  geom_point(aes(y= (pH *22) -145.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
-             size = 4.4,
-             colour = "orangered3") +
+  # geom_point(aes(y= (pH *22) -135 -0), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
+  #            size = 4.4,
+  #            colour = "orangered3") +
   # scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
   #name = "pH", 
   #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
-  annotate("rect", xmin= current.times.table$current.start.time[1],
-           xmax= current.times.table$current.file.time[1],
-           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin= current.times.table$current.start.time[2],
-           xmax= current.times.table$current.file.time[2],
-           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
-  annotate("rect", xmin= current.times.table$current.start.time[3],
-           xmax= current.times.table$current.file.time[3],
-           ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
+  # annotate("rect", xmin= current.times.table$current.start.time[1],
+  #          xmax= current.times.table$current.file.time[1],
+  #          ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
+  # annotate("rect", xmin= current.times.table$current.start.time[2],
+  #          xmax= current.times.table$current.file.time[2],
+  #          ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
+  # annotate("rect", xmin= current.times.table$current.start.time[3],
+  #          xmax= current.times.table$current.file.time[3],
+  #          ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
   # geom_vline(xintercept = 603.4333) +
   labs(x = "Minutes", 
        y = "% Change in Air-sac Area") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
-  theme(legend.position = c(0.08, 0.2))
+  theme(legend.position = c(0.5, 0.3))
 
 
 ###############################   extract plateaus   ####################################
