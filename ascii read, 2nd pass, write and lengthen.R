@@ -487,20 +487,24 @@ metaplats_ids.diam <- left_join(metaplats_ids,
                                 by = c("day", 
                                        "sac")) %>%
   mutate(lin_area = plat.area.mean / mean_width) %>% # aspect is a linearized area
-  group_by(day, sac) %>%
+  group_by(day, indvd, sac) %>%
   mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
   mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
   mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
   mutate(plat_length_means = mean_plat1.length * ((plat.areapct.mean/100) + 1)) %>% # length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
+  mutate(plat_length.mean_change = plat_length_means - plat_length_means[1]) %>% #change in length based on plat1 actual measurement
+  mutate(plat_frac.length.change = (plat_length_means - plat_length_means[1]) / plat_length_means[1]) %>% # fractional length change based on plat 1 length measurements
   mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
   mutate(sac.work = sac.force * lin_area_change) %>% # F * D
+  mutate(work.len.measure = sac.force * plat_length.mean_change) %>% # work based on real initial length measures: plat_length.mean_change
   mutate(species = as.factor(species)) %>%
-  mutate(pH.fct = as.factor(plat.pH.mean)) %>%
-  ungroup() %>%
-  group_by(indvd, sac) %>%
+  mutate(pH.factor = as.factor(plat.pH.mean)) %>%
+  # ungroup() %>%
+  # group_by(indvd, sac) %>%
   mutate(area.start = plat.area.mean[1]) %>% # make starting area column for normalization test
   #mutate(norm.work = sac.work / (((mean_width / 2)^2) * pi))
-  mutate(norm.work = sac.work / area.start)
+  mutate(norm.work = sac.work / area.start) %>%
+  mutate(norm.work.len.measure = work.len.measure / area.start)
   
 ## Normalizing by the force producing area doesn't seem to change the relationship between 
 ## the two species much. BUT normalizing to starting area does eliminate some BUT NOT ALL
@@ -512,23 +516,8 @@ metaplats_ids.diam <- left_join(metaplats_ids,
 
 print(metaplats_ids.diam)
 
-
-
-
-
-# indvds sampled as meany times per plateau pH as there are images for that plateau
-ggplot(metaplats_ids.diam, 
-       aes(y = aspect.pct.change, x = plat.pH.mean, 
-           group = species, colour = species, shape = indvd), 
-       lab.nb.digits = 4) +
-  geom_jitter(size = 3, width = 0.02) +
-  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13)) +
-  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
-  scale_color_manual(values=c("#D55E00", "#009e73")) +
-  theme_classic() +
-  #ylim(-1, 20) +
-  theme(legend.position = c(0.2, 0.7))
-
+#############   here're a couple plots with symbol options   ############
+############    Modeled better in evan_sacs                         ############
 
 # indvds sampled as meany times per plateau pH as there are images for that plateau
 # jittered with shape for individual
@@ -564,6 +553,16 @@ ggplot(metaplats_ids.diam,
   #theme(legend.position = c(0.2, 0.6))
 
 
+
+
+
+
+
+
+#################################################################################
+############                         ############
+############        modeling         ############
+#################################################################################
 
 library(lme4)
 model <- lmer(sac.work ~ pH.fct + (species | pH.fct), data = metaplats_ids.diam)
@@ -629,19 +628,6 @@ ggplot(metaplats_ids.diam,
        
 
 
-smaller.data.frame <- metaplats_ids.diam %>%
-  ungroup() %>%
-  select(species, pH.fct, sac.work) %>%
-  rename(pH = pH.fct) %>%
-  rename(y = sac.work)
-
-
-print(smaller.data.frame, n= 75)    
-
-    
-write_csv(smaller.data.frame,
-          "~/student_documents/UBC/Research/pH_stat/smaller.data.csv")
-    
 
 
 #try logging y

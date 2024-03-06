@@ -256,7 +256,7 @@ ggplot(data = plateaus.mean.sd,
                 width = 0.1,
                 size = 0.5)
 
-# modeled slopes pf sac size (% or abs) with pH
+# modeled slopes of sac size (% or abs) with pH
 ggplot(plateaus, aes(y = area.pct.change, x = med_pH, 
                      group = sac, 
                      colour = sac), 
