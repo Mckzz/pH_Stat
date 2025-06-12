@@ -27,8 +27,8 @@ jpg_files <- list.files(pattern ="*.jpg",
 print(jpg_files)
 
 #make a data frame with image file creation times (time axis for data)
-image.info <- data.frame(file.info(jpg_files)$mtime) %>%
-  rename(file.time = file.info.jpg_files..mtime) %>%
+image.info <- data.frame(file.info(jpg_files)$ctime) %>% # was mtime... idk why, ctime fixes x-axis for 2022-08-24
+  rename(file.time = file.info.jpg_files..ctime) %>%
   mutate(jpg_files) %>% #file names from list.files
   arrange(file.time) %>% #arrange by time of file creation
   mutate(seconds = as.numeric(file.time)) %>% #seconds from arbitrary date (POSIX)
@@ -40,7 +40,7 @@ image.info <- data.frame(file.info(jpg_files)$mtime) %>%
   group_by(sac) %>%
   mutate(area.pct.change =
            ((Area - Area[1]) / Area[1]) * 100) #%>%
-  #filter(sac == "1" | sac == "3") # %>% # remove sacs 2 and 3 (FOR UNANALYZABLE SACs, 2022-12-05)
+  #filter(sac == "1" | sac == "3") # %>% # remove sacs 2 and 4 (FOR UNANALYZABLE SACs, 2022-12-05)
   #filter(sac != "1")  # remove sac 1 (FOR UNANALYZABLE SAC, 2022-12-20)
   
 
@@ -164,8 +164,8 @@ ggplot(data = image.info,
   #          xmax= current.times.table$current.file.time[3],
   #          ymin=-16, ymax=0, fill = "green3", alpha=0.2) +
   # geom_vline(xintercept = 603.4333) +
-  labs(x = "Minutes", 
-       y = "% Change in Air-sac Area") +
+  # labs(x = "Minutes", 
+  #      y = "% Change in Air-sac Area") +
   theme_classic() +
   theme(axis.ticks.length = unit(-1, "mm")) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
@@ -227,46 +227,70 @@ print(plateaus, n= 40)
 
 #####    plot where error bars show degree of sac size change within the time of a given plateau    #####
 # mean and sd data frame for sac size change (abs or %) over the time within a plateau
-plateaus.mean.sd <-
-  plateaus %>%
+plateaus.mean.sd <- plateaus %>%
   select(-minutes_from_start, -day) %>% 
   group_by(plateau, med_pH, sac) %>%
   summarize(across(everything(), na.rm= T,
-                   tibble::lst(mean = mean, sd = sd)))
+                   tibble::lst(mean = mean, sd = sd))) %>%
+  group_by(plateau) %>%
+  mutate(average_sd_by_plateau = mean(area.pct.change_sd)) %>%
+  ungroup() %>%
+  mutate(mean_within_plat_sd = mean(average_sd_by_plateau)) %>%
+  mutate(average_sd = sd(area.pct.change_mean)) %>%
+  mutate(sd_per_sd.pct = (mean_within_plat_sd / average_sd) * 100) %>%
+  print()
 
-print(plateaus.mean.sd, n= 40)
+# write for variation posterity
+# write_csv(plateaus.mean.sd,
+#           "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis\\sac plateau variation/2022-12-21.csv")
 
-ggplot(data = plateaus.mean.sd, 
-       aes(x= med_pH, 
-           group = sac, 
+list_of_plats <- # list of plateaus.mean.sd files, made by above commented out write function (repeated for each file)
+  list.files(path = "~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis/sac plateau variation",
+    pattern = "\\.csv$", 
+    full.names = F) %>% #leave out folder path
+  print()
+
+# make a data frame of all the files
+plateau.variation.df <- read_delim(list_of_plats,
+                      delim = ",",
+                      id = "day") %>%
+  select(c(1, 2, 10:12)) %>%
+  summarize(across(c(3:5), na.rm = T,
+                   tibble::lst(mean = mean))) %>%
+  print()
+
+
+ggplot(data = plateaus.mean.sd,
+       aes(x= med_pH,
+           group = sac,
            colour= sac)) +
   geom_point(position = position_dodge(width = 0.1),
              aes(y= area.pct.change_mean)) +
-  geom_errorbar(position = position_dodge(width = 0.1), 
-                mapping = aes(x = med_pH, 
-                              ymin = area.pct.change_mean - area.pct.change_sd, 
-                              ymax = area.pct.change_mean + area.pct.change_sd), 
+  geom_errorbar(position = position_dodge(width = 0.1),
+                mapping = aes(x = med_pH,
+                              ymin = area.pct.change_mean - area.pct.change_sd,
+                              ymax = area.pct.change_mean + area.pct.change_sd),
                 width = 0.1,
                 size = 0.5)
-
-
-# modeled slopes of sac size (% or abs) with pH, assumed linear
-ggplot(plateaus, aes(y = area.pct.change, x = med_pH, 
-                     group = sac, 
-                     colour = sac), 
-       lab.nb.digits = 6) +
-  geom_point(size = 2, col = "red") +
-  geom_smooth(method = "lm", se = T) +
-  stat_regline_equation(label.x.npc = 0, 
-                        label.y.npc = 1, 
-                        aes(label = ..eq.label..)) +
-  stat_regline_equation(label.x.npc = 0, 
-                        label.y.npc = 0.8, 
-                        aes(label = ..rr.label..)) +
-  theme_classic()
-
-w <- lm(area.pct.change ~ med_pH, data = plateaus)
-summary(w)
+# 
+# 
+# # modeled slopes of sac size (% or abs) with pH, assumed linear
+# ggplot(plateaus, aes(y = area.pct.change, x = med_pH, 
+#                      group = sac, 
+#                      colour = sac), 
+#        lab.nb.digits = 6) +
+#   geom_point(size = 2, col = "red") +
+#   geom_smooth(method = "lm", se = T) +
+#   stat_regline_equation(label.x.npc = 0, 
+#                         label.y.npc = 1, 
+#                         aes(label = ..eq.label..)) +
+#   stat_regline_equation(label.x.npc = 0, 
+#                         label.y.npc = 0.8, 
+#                         aes(label = ..rr.label..)) +
+#   theme_classic()
+# 
+# w <- lm(area.pct.change ~ med_pH, data = plateaus)
+# summary(w)
 
 
 #################   getting coeffs for individual intervals eg. pH1 -- pH2, pH2 -- pH3... etc.     ###############

@@ -12,7 +12,7 @@ setwd("~/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step an
 ############     a column made of values at plateau 1 repeated to the length of the following df    ################
 
 plat1 <- plateaus.mean.sd %>%
-  select(Area_mean) %>%
+  select(Area_mean, plateau, med_pH) %>%
   filter(plateau == "plateau1") %>%
   rename(plat1.norm = Area_mean) %>%
   as.data.frame() %>%
@@ -100,6 +100,7 @@ current_cycles.df <- read_delim(current.files,
 
 head(current_cycles.df, n = 20)
 
+
 # current time calcs
 current_cycles <- left_join(current_cycles.df, current_times) %>%
   select(current.files, `Time (s)`, current.file.time, `WE(1).Current (A)`) %>%
@@ -131,25 +132,25 @@ ggplot(data = combined,
   geom_line(aes(y= area.pct.change)) +
   scale_colour_discrete(na.translate = F) +
   scale_y_continuous(breaks = scales::pretty_breaks(n = 15)) +
-  geom_point(aes(y= (pH *22) -131.278444 -8), # magnify relative to main axis, translate so first point = zero, translate for fit -> see scale_y_continuous
+  geom_point(aes(y= (pH *15) -90.146925 -0.5), # magnify relative to main axis, translate so first point = zero (subtract 1st pH x mag factor), translate for fit -> see scale_y_continuous
              size = 4.4,
              colour = "orangered3") +
- # scale_y_continuous(sec.axis = sec_axis(~./22 + 5.967202 + (8/22), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
-                                        #name = "pH", 
-                                         #breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
+  scale_y_continuous(sec.axis = sec_axis(~./15 + 6.009795 + (0.5/15), # / by magnify factor, + start pH, + inverse (+-) (vert translation/ mag factor)
+                                        name = "pH", 
+                                         breaks = c(6.0, 6.25, 6.5, 6.75, 7, 7.25))) +
   annotate("rect", xmin= current.times.table$current.start.time[1], 
            xmax= current.times.table$current.file.time[1], 
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-1, ymax=11, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[2], 
            xmax= current.times.table$current.file.time[2], 
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-1, ymax=11, fill = "green3", alpha=0.2) +
   annotate("rect", xmin= current.times.table$current.start.time[3], 
            xmax= current.times.table$current.file.time[3], 
-           ymin=-10, ymax=6, fill = "green3", alpha=0.2) +
+           ymin=-1, ymax=11, fill = "green3", alpha=0.2) +
   #geom_vline(xintercept = 603.4333) +
   labs(x = "Minutes", 
        y = "% Change in Air-sac Area") +
-  theme_classic() +
+  theme_light() +
   theme(axis.ticks.length = unit(-1, "mm")) +
   scale_x_continuous(breaks = scales::pretty_breaks(n = 40)) +
   theme(legend.position = c(0.08, 0.2))
@@ -173,6 +174,9 @@ plateau.3 <- combined %>%
   mutate(plateau = "plateau3") %>%
   mutate(med_pH = median(pH, na.rm = T)) %>%
   as_tibble()
+
+
+
 
 
 
@@ -236,7 +240,8 @@ write_csv(meta.plateaus,
 #   filter(day != "2022-11-01")
 
 
-
+# meta.plateaus <- meta.plateaus %>%
+#   filter(row_number() < 375)
 
 #####################################################################################################
 ##  for all together
@@ -278,7 +283,6 @@ metaplats_ids <- merge(meta.plateaus, ids, by = c('day','sac')) %>%
 print(metaplats_ids)
 
 
-
 # indvds sampled as meany times per plateau pH as there are images for that plateau
 
 ggplot(metaplats_ids, 
@@ -286,15 +290,12 @@ ggplot(metaplats_ids,
            group = species, colour = species, shape = indvd), 
        lab.nb.digits = 4) +
   geom_jitter(size = 3, width = 0.02) +
-  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11)) +
+  #scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11)) +
   geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
   scale_color_manual(values=c("#D55E00", "#009e73")) +
   theme_classic() +
   #ylim(-1, 20) +
   theme(legend.position = c(0.2, 0.7))
-
-
-
 
 
 
@@ -328,8 +329,6 @@ install.packages("lmerTest")
 library(lmerTest)
 
 y <- lmer()
-
-
 
 
 #############     getting a value for airsac width averaged over the 1st plateau    ##############
@@ -482,29 +481,69 @@ print(plat1_width_means, n = 25)
 # Linearize first? (plat.area.mean / mean_width)
 # 
 # create linearized measure column using widths
+####    all base length units (not ratios) are mm. force and work SI units made by dividing mm by 1000    ####
 metaplats_ids.diam <- left_join(metaplats_ids, 
                                 plat1_width_means, 
                                 by = c("day", 
                                        "sac")) %>%
-  mutate(lin_area = plat.area.mean / mean_width) %>% # aspect is a linearized area
+  mutate(plat_length_means = mean_plat1.length * ((plat.areapct.mean/100) + 1)) %>% # (mm)length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
+  mutate(width.long.axis.mean = plat.area.mean / plat_length_means) %>% # calculate mean width using area to account for tapering
+  #mutate(lin_area = plat.area.mean / mean_width) %>% # aspect is a linearized area. Now using calc length
   group_by(day, indvd, sac) %>%
-  mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
-  mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
-  mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
-  mutate(plat_length_means = mean_plat1.length * ((plat.areapct.mean/100) + 1)) %>% # length at 1st plateau x %change/100 for the decimal, +1 so its an increase. (n increases by 90% = n*1.9)
-  mutate(plat_length.mean_change = plat_length_means - plat_length_means[1]) %>% #change in length based on plat1 actual measurement
+  #mutate(lin_area.pct.change = (((lin_area - lin_area[1]) / lin_area[1]) * 100)) %>% # % change in aspect from 1st plateau
+  #mutate(area_change = (plat.area.mean - plat.area.mean[1])) %>% # Just the change in area
+  #mutate(lin_area_change = (lin_area - lin_area[1])) %>% # Just the change in linearized area
+  mutate(plat_length.mean_change = plat_length_means - plat_length_means[1]) %>% # (mm) change in length based on plat1 ACTUAL MEASUREMENT
   mutate(plat_frac.length.change = (plat_length_means - plat_length_means[1]) / plat_length_means[1]) %>% # fractional length change based on plat 1 length measurements
-  mutate(sac.force = ((mean_width / 2)^2) * pi * 41368.5) %>% # 41368.5 N/m sqrd = 6 psi
-  mutate(sac.work = sac.force * lin_area_change) %>% # F * D
-  mutate(work.len.measure = sac.force * plat_length.mean_change) %>% # work based on real initial length measures: plat_length.mean_change
+  mutate(sac.force = (((width.long.axis.mean / 1000) / 2)^2) * pi * 41368.5) %>% # (Newtons): (41368.5 N/m sqrd = 6 psi) x area (and width from mm to meters)
+  #mutate(sac.work = sac.force * (lin_area_change / 1000)) %>% # F * D (and mm to m)
+  mutate(work.len.measure = (sac.force * (plat_length.mean_change / 1000))) %>% # Absolute work (J = F * D (Nm) (and mm to m) work based on real initial length measures: plat_length.mean_change
   mutate(species = as.factor(species)) %>%
   mutate(pH.factor = as.factor(plat.pH.mean)) %>%
-  # ungroup() %>%
-  # group_by(indvd, sac) %>%
   mutate(area.start = plat.area.mean[1]) %>% # make starting area column for normalization test
   #mutate(norm.work = sac.work / (((mean_width / 2)^2) * pi))
-  mutate(norm.work = sac.work / area.start) %>%
-  mutate(norm.work.len.measure = work.len.measure / area.start)
+  #mutate(norm.work = sac.work / area.start) %>%
+  mutate(norm.work.len.measure = ((work.len.measure / (plat_length_means[1] / 1000)))) %>% # (mJ/m) work normalized to plateau 1 length (/1000 for mm to m for plat lengths)
+  mutate(mJ_per_length = norm.work.len.measure * 1000) %>%
+  mutate(mJ = mJ_per_length * (plat_length_means[1])) %>%
+  ungroup() %>%
+  group_by(plateau, species) %>%
+  mutate(mean.mJ_per_length = mean(mJ_per_length),
+         sd.mJ_per_length = sd(mJ_per_length)) %>% # just for reporting means and stdvs
+  mutate(mean.plat_frac.length.change = mean(plat_frac.length.change)) %>%
+  mutate(mean.norm.work.len.measure = mean(norm.work.len.measure)) %>%
+  ungroup() %>%
+  group_by(species) %>%
+  mutate(species_mean_width = mean(width.long.axis.mean)) %>% ##  could possibly want max width for other reasons?
+  mutate(species_sd_width = sd(width.long.axis.mean)) %>%
+  ungroup() %>%
+  # group_by(day, plateau, indvd) %>%
+  # mutate(ID = cur_group_id(), .after = indvd) %>%
+  as.data.frame() #%>%
+  #print()
+
+str(metaplats_ids.diam)
+
+# get airsac mean widths for each species
+
+# DFs just for seeing species means separately
+metaplats_ids.diam.am <- metaplats_ids.diam %>%
+  filter(species == "americanus", plateau == "plateau1") %>%
+  select(c(1:3), width.long.axis.mean) %>%
+  mutate(mean_width.long.axis.mean = mean(width.long.axis.mean,),
+         sd_width.long.axis.mean = sd(width.long.axis.mean))
+
+metaplats_ids.diam.triv <- metaplats_ids.diam %>%
+  filter(species == "trivittatus", plateau == "plateau1") %>%
+  select(c(1:3), width.long.axis.mean) %>%
+  mutate(mean_width.long.axis.mean = mean(width.long.axis.mean,),
+         sd_width.long.axis.mean = sd(width.long.axis.mean)) 
+
+# quick check of mean width relation to length
+ggplot(data = metaplats_ids.diam, aes(x = plat_length_means, 
+                                      y = width.long.axis.mean,
+                                      colour = species)) +
+  geom_point()
   
 ## Normalizing by the force producing area doesn't seem to change the relationship between 
 ## the two species much. BUT normalizing to starting area does eliminate some BUT NOT ALL
@@ -515,224 +554,4 @@ metaplats_ids.diam <- left_join(metaplats_ids,
 ####################      good thing to talk to Bob about?
 
 print(metaplats_ids.diam)
-
-#############   here're a couple plots with symbol options   ############
-############    Modeled better in evan_sacs                         ############
-
-# indvds sampled as meany times per plateau pH as there are images for that plateau
-# jittered with shape for individual
-ggplot(metaplats_ids.diam, 
-       aes(y = norm.work, x = plat.pH.mean, 
-           group = species, colour = species, shape = indvd), 
-       lab.nb.digits = 4) +
-  geom_jitter(size = 3, width = 0.02) +
-  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13)) +
-  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
-  scale_color_manual(values=c("#D55E00", "#009e73")) +
-  theme_classic() +
-  #ylim(-1, 20) +
-  theme(legend.position = NULL) #+
-  #theme(legend.position = c(0.2, 0.6))
-
-# indvds sampled as meany times per plateau pH as there are images for that plateau
-# jittered shape for species
-ggplot(metaplats_ids.diam, 
-       aes(y = norm.work, x = plat.pH.mean, 
-           group = species, colour = species), 
-       lab.nb.digits = 4) +
-  geom_jitter(size = 4, shape = 1, width = 0.01) +
-  geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
-  scale_color_manual(values=c("#D55E00", "#009e73")) +
-  annotate("rect", xmin = metaplats_ids.diam$plat.pH.mean - metaplats_ids.diam$plat.pH.sd, 
-           xmax = metaplats_ids.diam$plat.pH.mean + metaplats_ids.diam$plat.pH.sd, 
-           ymin = -30, ymax = -25, fill = "black") +
-  theme_classic() +
-  #ylim(-1, 20) +
-  theme(legend.position = NULL) +
-  theme(axis.ticks.length=unit(-0.1, "cm")) #+
-  #theme(legend.position = c(0.2, 0.6))
-
-
-
-
-
-
-
-
-#################################################################################
-############                         ############
-############        modeling         ############
-#################################################################################
-
-library(lme4)
-model <- lmer(sac.work ~ pH.fct + (species | pH.fct), data = metaplats_ids.diam)
-
-summary(model)
-coef(model)
-metaplats_ids.diam$fit <- predict(model)   #Add model fits to dataframe
-
-anova(model)
-
-fit <- predict(model)   #Add model fits to dataframe
-conf <- VarCorr(model)
-
-plot(model)
-
-
-# new package stuff
-merTools()
-
-
-
-# simple model. sac.work predicted by categorical variable species (random effect)... 
-# and by continuous variable plat.pH.mean
-model2 <- lmer(sac.work ~ (1 | species) + pH.fct, data = metaplats_ids.diam)
-summary(model2)
-confint(model2, level = 0.95)
-metaplats_ids.diam$fit2 <- predict(model2, se.fit = T)   #Add model fits to dataframe
-
-
-# indvds sampled as meany times per plateau pH as there are images for that plateau
-# jittered shape for species
-# for black and white (YSAS)
-ggplot(metaplats_ids.diam, 
-       aes(y = sac.work, x = plat.pH.mean, 
-           group = species, shape = species), 
-       lab.nb.digits = 4) +
-  geom_jitter(size = 4, width = 0.01) +
-  #geom_smooth(method = "loess", se = T, span = 0.8) + # 95CI from se = T by default
-  geom_line(aes(y = fit)) +
-  scale_shape_manual(values=c(1, 6)) +
-  annotate("rect", xmin = metaplats_ids.diam$plat.pH.mean - metaplats_ids.diam$plat.pH.sd, 
-           xmax = metaplats_ids.diam$plat.pH.mean + metaplats_ids.diam$plat.pH.sd, 
-           ymin = -30, ymax = -25, fill = "black") +
-  theme_classic() +
-  #ylim(-1, 20) +
-  theme(legend.position = NULL) +
-  theme(axis.ticks.length=unit(-0.1, "cm")) #+
-#theme(legend.position = c(0.2, 0.6))
-
-hist(metaplats_ids.diam$sac.work)
-
-
-
-
-# with just straight lines and all data assumed to be linear
-ggplot(metaplats_ids.diam, 
-       aes(y = sac.work, x = plat.pH.mean, 
-           group = species, shape = species))  + 
-  #geom_smooth(data = metaplats_ids.diam, method = "lm", formula = sac.work ~ plat.pH.mean + (sac.work | species)) +
-  geom_smooth(method = "lm", se = T, span = 0.8) +
-  #geom_line() + 
-  geom_point()
-       
-
-
-
-
-#try logging y
-
-
-setwd("~/student_documents/UBC/Research/pH_stat")
-
-sac <- read.csv("smaller.data.csv")
-sac$species <- as.factor(sac$species)
-sac$pH <- as.numeric(sac$pH)
-
-library(lmerTest)
-mod1 <- lm(y ~ pH, sac)
-mod2 <- lmer(y ~ pH + (species | pH), sac)
-
-# predict function for bootstrapping
-predfn <- function(.) {
-  predict(., newdata=new, re.form=NULL)
-}
-
-# summarise output of bootstrapping
-sumBoot <- function(merBoot) {
-  return(
-    data.frame(fit = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.5, na.rm=TRUE))),
-               lwr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.025, na.rm=TRUE))),
-               upr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.975, na.rm=TRUE)))
-    )
-  )
-}
-
-# Bootstrapped
-new <- sac # the bootMer function uses the df "new" for data
-boot <- lme4::bootMer(mod2, predfn, nsim=250, use.u=TRUE, type="parametric")
-
-sac <- cbind(sac, dplyr::bind_cols(sumBoot(boot)))
-
-# add pH sd column from metaplats_ids.diam
-sac$pH.sd <- metaplats_ids.diam$plat.pH.sd
-
-ggplot(data = sac,
-       aes(x = pH,
-           y = y,
-           shape = species)) +
-  scale_shape_manual(values=c(1, 6)) +
-  geom_jitter(size = 4, width = 0.01) +
-  #geom_abline(slope = fit_lm$coefficients[2], intercept = fit_lm$coefficients[1]) +
-  #geom_abline(slope = ranef(mod2)$pH[[2]], intercept = ranef(mod2)$pH[[1]]) +
-  geom_line(aes(x = pH, y = fit), show.legend = FALSE) +
-  geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, show.legend = FALSE) +
-  annotate("rect",
-           xmin = sac$pH - sac$pH.sd,
-           xmax = sac$pH + sac$pH.sd,
-           ymin = -40, ymax = -35, fill = "black") +
-  theme_classic() +
-  theme(axis.ticks.length=unit(-0.1, "cm"))
-
-
-# stats
-# anova(mod2)
-# summary(mod2)
-
-# compare the two species as well
-# mod_am <- lm(y ~ pH, sac[sac$species == "americanus", ])
-# mod_tr <- lm(y ~ pH, sac[sac$species == "trivittatus", ])
-
-#  make pH a factor for anova
-sac <- sac %>%
-  mutate(pH = as.factor(pH))
-
-mod3 <- aov(y ~ pH * species, sac)
-predict(mod3)
-confint(mod3)
-
-summary(mod3)
-TukeyHSD(mod3)
-
-
-## for t test, split up species then do in excel lol
-sac.trivt <- sac %>% 
-  filter(species == "trivittatus")
-  
-write_csv(sac.trivt, 
-            "~/student_documents/UBC/Research/pH_stat/sac.trivit.csv")
-
-sac.am <- sac %>% 
-  filter(species == "americanus")
-
-write_csv(sac.am, 
-          "~/student_documents/UBC/Research/pH_stat/sac.am.csv")
-
-## bootstrapoped 95 CI from a linear mixed effect
-## large variance for species indicates that random effect for that is appropriate
-
-
-
-## quadratic as evidenced by the AIC shit Sarah P did
-ggplot(data = sac,
-       aes(x = as.numeric(pH),
-           y = y,
-           shape = species)) +
-  geom_point() +
-  geom_smooth(method = "lm", 
-              formula = y ~ (x + I(x^2)),
-              color = '#555555') +
-  #geom_line(aes(x = pH, y = fit), show.legend = FALSE) +
-  #geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, show.legend = FALSE) +
-  theme_minimal()
 

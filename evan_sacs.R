@@ -2,33 +2,10 @@ library(tidyverse)
 library(ggplot2)
 library(readr)
 library(ggpubr)
-
-###############              ###############
-
-smaller.data.frame <- metaplats_ids.diam %>%
-  ungroup() %>%
-  select(species, pH.fct, sac.work) %>%
-  rename(pH = pH.fct) %>%
-  rename(y = sac.work)
+library(emmeans)
+library(lme4)
 
 
-print(smaller.data.frame, n= 75)    
-
-
-write_csv(smaller.data.frame,
-          "~/student_documents/UBC/Research/pH_stat/smaller.data.csv")
-
-
-#############               #################
-
-
-sac <- read.csv("C:\\Users\\evanm\\Documents\\student_documents\\UBC\\Research\\pH_stat\\smaller.data.csv")
-sac$species <- as.factor(sac$species)
-sac$pH <- as.numeric(sac$pH)
-
-str(sac)
-
-###################################################
 
 
 # Check your y variable. A linear model assumes
@@ -39,134 +16,195 @@ hist(metaplats_ids.diam$log_norm.work.len.measure) # not great, but much better.
 # Not sure if log(normalized work) is the correct way forward. Proceed with regular y!
 
 
-# # normalized work  by starting sac area (taken from main big code doc)
-# sac$norm.work <- metaplats_ids.diam$norm.work
-# 
-# # throws off histogram normal distb test to have all these zeros...
-# sac <- sac %>%
-#   mutate(log_norm.work = replace(log_norm.work,
-#                                   log_norm.work == "-Inf",
-#                                   0))
-# print(sac)
-
-
-# filter for only subsequent pHs where work has been done
-# sac_after0 <- sac %>%
-#   filter(log_norm.work > 0)
-# 
-# print(sac_after0)
-# hist(sac_after0$log_norm.work) #histogram is the same as log_y
-# 
-# # get histograms for data at the two subsequent pHs separately
-# sac_1st_alk <- sac_after0 %>%
-#   filter(pH < 6.4)
-# print(sac_1st_alk)
-# hist(sac_1st_alk$y)
-# 
-# sac_2nd_alk <- sac_after0 %>%
-#   filter(pH > 6.3)
-# print(sac_2nd_alk)
-# hist(sac_2nd_alk$log_norm.work)
-# # log is better for 2nd alk, non log is better for 1s alk... in terms of norm distribution
-
-
-mod1 <- lm(norm.work.len.measure ~ plat.pH.mean, metaplats_ids.diam)
-mod2 <- lm(norm.work.len.measure ~ plat.pH.mean + species, metaplats_ids.diam)
-mod3 <- lm(norm.work.len.measure ~ plat.pH.mean * species, metaplats_ids.diam)
-mod4 <- lm(norm.work.len.measure ~ (plat.pH.mean + I(plat.pH.mean^2)) * species, metaplats_ids.diam)
-mod5 <- lm(norm.work.len.measure ~ (plat.pH.mean + I(plat.pH.mean^2) + I(plat.pH.mean^3)) * species, metaplats_ids.diam)
+mod1 <- lm(mJ_per_length ~ plat.pH.mean, metaplats_ids.diam)
+mod2 <- lm(mJ_per_length ~ plat.pH.mean + species, metaplats_ids.diam)
+mod3 <- lm(mJ_per_length ~ plat.pH.mean * species, metaplats_ids.diam)
+mod4 <- lm(mJ_per_length ~ (plat.pH.mean + I(plat.pH.mean^2)) * species, metaplats_ids.diam)
+mod5 <- lm(mJ_per_length ~ (plat.pH.mean + I(plat.pH.mean^2) + I(plat.pH.mean^3)) * species, metaplats_ids.diam)
 # modX - try sigmoid model here?
 
 AIC(mod1, mod2, mod3, mod4, mod5)
-# Given your data, models 4 and 5 are exactly the same 
+# Given your data, models 4 and 5 are exactly the same
 
-###################     try logging these at some point     #####################
-# modX - try sigmoid model here?
+
+
+ggplot(data.frame(x = c(6, 6.45)), aes(x = x)) + 
+  #stat_function(fun = quad.func.am, linewidth = 2) +
+  stat_function(fun = quad.func.am.manual, linewidth = 2) +
+  #geom_line(data = newdata, aes(x = plat.pH.mean, y = fit)) +
+  #stat_function(fun = quad.func.am.manual_upr, linewidth = 0.5) 
+  #stat_function(fun = quad.func.triv, linewidth = 2) +
+  geom_hline(yintercept = 7.121400e-02) + 
+  geom_hline(yintercept = 1.059670e-01)
+
+ggplot(data = newdata, aes(x = plat.pH.mean, color = species)) +
+  geom_line(y = fit) +  # predicted line
+  geom_ribbon(aes(ymin = lwr, ymax = upr, fill = species), alpha = 0.3, color = NA) +  # confidence band
+  theme_minimal() +
+  labs(
+    y = "mJ per length",
+    x = "pH",
+    title = "Quadratic fit with 95% confidence bands"
+  )
 
 
 # You can use either mod4 or 5, doesn't really matter
 # apply the confidence intervals to the main df
-metaplats_ids.diam <- cbind(metaplats_ids.diam, predict(mod4, metaplats_ids.diam, interval = 'confidence'))
+metaplats_ids.diam.mod4 <- cbind(metaplats_ids.diam, predict(mod4, metaplats_ids.diam, interval = 'confidence'))
 
 # for pH error bars use metaplats_ids.diam$plat.pH.sd
+
+
+mod4.mix <- lmer(mJ_per_length ~ (plat.pH.mean + I(plat.pH.mean^2)) * species + (1|indvd), metaplats_ids.diam)
+
 
 
 #####################     try log_norm.work    ##################
 ggplot(data = metaplats_ids.diam,
        aes(x = plat.pH.mean,
-           y = plat_frac.length.change,
+           y = mJ_per_length,
+           #y = mJ,
            #y = norm.work,
-           shape = species)) +
+           shape = species,
+           linetype = species)) +
   scale_shape_manual(values=c(1, 6)) +
-  geom_jitter(size = 3.5, width = 0.01) +
+  geom_point(size = 3.5) +
   geom_smooth(method = "lm", 
               formula = y ~ (x + I(x^2)),
               color = '#555555') +
-  #geom_line(aes(x = pH, y = fit), show.legend = FALSE) +
-  #geom_ribbon(aes(ymin = lwr, ymax = upr), alpha = 0.3, show.legend = FALSE) +
-  # annotate("rect",
-  #          xmin = sac$pH - sac$pH.sd,
-  #          xmax = sac$pH + sac$pH.sd,
-  #          ymin = -30, ymax = -25, fill = "black") +
-  #ylab("work (J) per starting sac length") +
-  #ylab("Change in length (mm)") +
-  ylab("Fractional length change (L/L0)") +
-  #labs(title = "using measured lenngths for plateau 1") +
-  coord_flip() + # for stress strain, with length change instead of work
-  #labs(title = "using linearized area") +
+  geom_hline(yintercept = 0.071) +
+  geom_hline(yintercept = 0.1055) +
+  annotate("rect", xmin = metaplats_ids.diam$plat.pH.mean - metaplats_ids.diam$plat.pH.sd,
+           xmax = metaplats_ids.diam$plat.pH.mean + metaplats_ids.diam$plat.pH.sd,
+           ymin = -0.01, ymax = -0.008, fill = "black") +
+  ylim(-0.01, 0.17) +
+  xlim(5.98, 6.5) +
+  labs(y = "mJ / starting air-sac length", x = "pH") +
   theme_classic() +
   theme(axis.ticks.length=unit(-0.1, "cm")) +
-  theme(legend.position = c(0.8, 0.2))
+  theme(legend.position = c(0.2, 0.8))
+
+
+
 
 #setwd("C:/Users/evanm/Documents/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis")
-setwd("C:/Users/evanm/Documents/student_documents/UBC/Research/pH_stat")
+#setwd("C:/Users/evanm/Documents/student_documents/UBC/Research/pH_stat")
 
-ggsave("work with measured lengths for plateau 1.pdf", 
+ggsave("pH-stat mJ per starting air-sac length.png", 
        units = c("cm"), 
-       width = 12, height = 12) 
+       width = 14, height = 14,
+       path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\chapters\\whole, chapter files\\Chapter 4\\whole chapter versions")
+       #path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\chapters\\whole, chapter files\\Chapter 4")
 
-ggsave("pH-stat for combined stress-strain graph.pdf", 
-       units = c("cm"), 
-       width = 12, height = 12) 
+
+
+##
+## playing with select and filter to get simple experimental design stuff ##
+##
+
+get.n.triv <- metaplats_ids.diam %>%
+  select(species, indvd, sac) %>%
+  filter(species == "trivittatus") %>%
+  unique()
 
 
 
 # stats
-mod4nw <- lm(norm.work ~ (pH + I(pH^2)) * species, sac)
-modxnw <- lm(norm.work.len.measure ~ (pH + I(pH^2)) * species, sac)
 
-anova(modxnw)
+anova(mod4)
 summary(mod4)
-sjPlot::plot_model(mod4nw)
+emtrends(mod4, ~ species, var="plat.pH.mean")
+sjPlot::plot_model(mod4)
 
+emmeans(mod4, "plat.pH.mean", by = "species", data = metaplats_ids.diam) #maybe makes sense?
+emmeans(mod4, list(pairwise ~ species), adjust = "tukey") #I think this is a comparison over the whole pH range...
+
+##  This works!
+str(metaplats_ids.diam)
+mod4.aov <- aov(mJ_per_length ~ (as.factor(plat.pH.mean) + I(plat.pH.mean^2)) * species, metaplats_ids.diam)
+summary(mod4.aov)
+TukeyHSD(mod4.aov)
+
+
+str
 aov.mod <- aov(norm.work ~ (as.factor(pH) + I(pH^2)) * species, sac)
-TukeyHSD(aov.mod)
+TukeyHSD(aov.mod) #this works with the old stuff...
+
+my_equation.am <- function(x) ({x*-0.40293 + (x^2)*0.03443}) +1.178
+ggplot(data.frame(x = c(6, 6.45)), aes(x = x)) + 
+  stat_function(fun = my_equation.am, linewidth = 2)
+
+###########  model brought in from edulis R for plotting  ########### 
+
+# equation for a given x here in the edulis plot, y scale = range for pH stat and also hlines in edulis work plot
+#(x*(-2.635*(10^-6)) + (x^2)*(-4.974*(10^-7)) + 4.59*(10^-5)
+#define equation. abs value for positive work done
+my_equation <- function(x) ((abs({x*-2.724e-06 + (x^2)*-5.155e-07 + 5.500e-05}))*1000) -0.6835475
+my_equation.upr <- function(x)((abs({x*(-2.724e-06 + 5.040e-06) + (x^2)*(-5.155e-07 + 5.728e-08) + (5.500e-05 + 1.261e-04)}))*1000) -0.6835475 # +se
+ ##  * 1000 for mJ, -0.6835475 so set interval start as zero (work done starting from pH-stat end point)
+
+
+#plot equation
+ggplot(data.frame(x = c(35.30079, 52.0624)), aes(x = x)) + 
+  stat_function(fun = my_equation, linewidth = 2) +
+  stat_function(fun = my_equation.upr, linewidth = 1, linetype = 2) +
+  stat_function(fun = my_equation.lwr, linewidth = 1, linetype = 2)
+
+# Define original and new x ranges
+x_old_min <- 35.30079
+x_old_max <- 52.0624
+x_new_min <- 6.00
+x_new_max <- 6.45
+
+# Compute scaling coefficients
+b <- (x_new_max - x_new_min) / (x_old_max - x_old_min)
+a <- x_new_min - b * x_old_min
+
+# Print values to check
+a
+b
+
+# modified function to keep the same y values but show on the pH stat x range
+ggplot(data.frame(x = c(6.00, 6.45)), aes(x = x)) + 
+  stat_function(fun = function(x) my_equation((x - a)/ b), linewidth = 2) +
+  stat_function(fun = function(x) my_equation.upr((x - a)/ b), linewidth = 1, linetype = 2) +
+  stat_function(fun = function(x) my_equation.lwr((x - a)/ b), linewidth = 1, linetype = 2)
 
 
 
-# If we want to mess around with random effects....
-# here's the old code and jk we probably don't want to anyway
+###################################################################################################
 
-library(lmerTest)
+# ranges modified for showing with edulis data ((for exporting to illustrator))
+ggplot(data = metaplats_ids.diam,
+       aes(x = plat.pH.mean,
+           y = mJ_per_length,
+           #y = mJ,
+           #y = norm.work,
+           shape = species,
+           linetype = species)) +
+  scale_shape_manual(values=c(1, 6)) +
+  geom_point(size = 3.5) +
+  geom_smooth(method = "lm", 
+              formula = y ~ (x + I(x^2)),
+              color = '#555555') +
+  stat_function(fun = function(x) my_equation((x - a)/ b), ## edulis work, SE below
+                linewidth = 2, colour = "#619CFF") + 
+  stat_function(fun = function(x) my_equation.upr((x - a)/ b), 
+                linewidth = 1, linetype = 2, colour = "#619CFF") +
+  stat_function(fun = function(x) my_equation.lwr((x - a)/ b), 
+                linewidth = 1, linetype = 2, colour = "#619CFF") +
+  labs(y = "mJ / starting air-sac length", x = "pH") +
+  #geom_hline(yintercept = 0.8005299) + # upper bound for edulis (difference between lower and upper bounds on edulis plot restricted to pH stat scale)
+  # xlim(6.0, 6.45) +
+  theme_classic() +
+                                                                                                                                                                                                                                                                         
+  theme(legend.position = c(0.2, 0.8))
 
+#setwd("C:/Users/evanm/Documents/student_documents/UBC/Research/pH_stat/4mM buffer, for final pH step analysis")
+#setwd("C:/Users/evanm/Documents/student_documents/UBC/Research/pH_stat")
 
-# predict function for bootstrapping
-predfn <- function(.) {
-  predict(., newdata=new, re.form=NULL)
-}
-
-# summarise output of bootstrapping
-sumBoot <- function(merBoot) {
-  return(
-    data.frame(fit = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.5, na.rm=TRUE))),
-               lwr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.025, na.rm=TRUE))),
-               upr = apply(merBoot$t, 2, function(x) as.numeric(quantile(x, probs=.975, na.rm=TRUE)))
-    )
-  )
-}
-
-# Bootstrapped
-new <- sac # the bootMer function uses the df "new" for data
-boot <- lme4::bootMer(mod2, predfn, nsim=250, use.u=TRUE, type="parametric")
-
-sac <- cbind(sac, dplyr::bind_cols(sumBoot(boot)))
+ggsave("pH-stat mJ per starting air-sac length, edulis y-scale.pdf", 
+       units = c("cm"), 
+       width = 14, height = 14,
+       #path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\beer talk\\2024, March")
+       path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\chapters\\whole, chapter files\\Chapter 4/whole chapter versions")
