@@ -63,11 +63,11 @@ ggplot() +
   theme(axis.ticks.length=unit(-0.1, "cm")) +
   labs(x = "pH", y = "mJ / starting air-sac length (m)")
 
-ggsave("plot all together, model predic lines, pH x.pdf", 
-       units = c("cm"), 
-       width = 14, height = 14,
-       #path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\beer talk\\2024, March")
-       path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\chapters\\whole, chapter files\\Chapter 4/whole chapter versions")
+# ggsave("plot all together, model predic lines, pH x.pdf", 
+#        units = c("cm"), 
+#        width = 14, height = 14,
+#        #path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\beer talk\\2024, March")
+#        path = "~/student_documents\\UBC\\Research\\Writing, talks, notes\\chapters\\whole, chapter files\\Chapter 4/whole chapter versions")
 
 # get data for work done over pH-stat interval by each species
 # model comparison for species
