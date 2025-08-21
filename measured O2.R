@@ -1,4 +1,4 @@
-install.packages("tidyverse")
+#install.packages("tidyverse")
 library(tidyverse)
 library(ggplot2)
 library(readr)
@@ -44,7 +44,7 @@ ggplot(data = O2,
   theme(axis.ticks.length = unit(-1, "mm")) +
   labs(y = "Oxygen saturation (%)", x = "Min") +
   theme(axis.title=element_text(size=14)) +
-  scale_x_continuous(breaks = scales::pretty_breaks(n = 24))
+  scale_x_continuous(breaks = scales::pretty_breaks(n = 15))
 
 
 ggsave("pH-stat O2 sat.png", 

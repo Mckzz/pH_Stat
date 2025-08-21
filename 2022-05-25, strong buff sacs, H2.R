@@ -38,9 +38,7 @@ OCPs.df <- readr::read_csv(list_of_OCP.CSVs, id = "OCP.files") %>%
 head(OCPs.df, n = 10)
 
 ######################     set working directory to folder with image files     ######################
-# sac size data image file times
 setwd("~/student_documents/UBC/Research/pH_stat/with_a_sac_(prelim)/2022-05-25, strong buff H2 control/2022_05_25")
-
 
 ######################     import csv w/ measurements (airsac sizes)    ######################
 data <- 
@@ -71,12 +69,12 @@ OCPs_with_calcs <- OCPs.df %>%
   mutate(OCP.files = substr(OCP.files, 1, nchar(OCP.files)-4)) %>%
   group_by(OCP.files) %>%
   mutate(median_V = median(V)) %>%
-  mutate(exp_start = (exp.times$seconds[1])) %>%
+  mutate(exp_start = (exp.times$seconds[1])) %>% #1st image POSIX time
   mutate(exp.time.point = 
            ((nox.times$nox.seconds[
              nox.times$nox_files == OCP.files] ## the end of an OCP run
              - median(seconds)) ## the middle of an OCP run (to be subtracted from end time for 1/2 time)
-            - exp_start) ## put in relation to POSIX experiment start time
+            - exp_start) ## put in relation to POSIX experiment start time (1st image)
          /60) ## minutes
 
 head(OCPs_with_calcs)
@@ -90,7 +88,6 @@ OCP_V_time <- OCPs_with_calcs %>%
   mutate(minutes_from_OCP_start = NULL) %>%
   mutate(exp_start = NULL) %>%
   mutate(OCP = NULL) %>%
-  na.omit() %>%
   unique() %>%
   rename(rep.minutes_from_start = exp.time.point)
 
